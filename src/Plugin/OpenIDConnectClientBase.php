@@ -45,6 +45,15 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
   protected $loggerFactory;
 
   /**
+   * The minimum set of scopes for this client.
+   *
+   * @var array|null
+   *
+   * @see \Drupal\openid_connect\OpenIDConnectClaims::getScopes()
+   */
+  protected $clientScopes = NULL;
+
+  /**
    * The constructor.
    *
    * @param array $configuration
@@ -200,6 +209,13 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    */
   public function getEndpoints() {
     throw new Exception('Unimplemented method getEndpoints().');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getClientScopes(): ?array {
+    return $this->clientScopes;
   }
 
   /**
