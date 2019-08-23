@@ -15,6 +15,7 @@ use Drupal\openid_connect\Plugin\OpenIDConnectClientInterface;
 use Drupal\user\UserDataInterface;
 use Drupal\user\UserInterface;
 use Drupal\Component\Utility\EmailValidatorInterface;
+use Drupal\Component\Render\MarkupInterface;
 
 /**
  * Main service of the OpenID Connect module.
@@ -91,6 +92,38 @@ class OpenIDConnect {
    * @var Drupal\Core\Logger\LoggerChannelInterface
    */
   protected $logger;
+
+  /**
+   * State of the authorization.
+   *
+   * @var string
+   */
+  protected $authorizationState = 'authorization_not_attempted';
+
+  /**
+   * Possible authorization state constants.
+   */
+  const AUTHORIZATION_NOT_ATTEMPTED = 'authorization_not_attempted';
+
+  const ATTEMPTING_AUTHORIZATION = 'attempting_authorization';
+
+  const SUCCESSFULL_LOGIN = 'successfull_login';
+  const SUCCESSFULL_CONNECTION = 'successfull_connection';
+
+  const ERROR_AUTHORIZATION_FAILED = 'error_authorization_failed';
+  const ERROR_AUTHORIZATION_DENIED = 'error_authorization_denied';
+  const ERROR_INVALID_EMAIL = 'error_invalid_email';
+  const ERROR_EMAIL_TAKEN = 'error_email_taken';
+  const ERROR_REGISTRATION_RESTRICTED = 'error_registration_restricted';
+  const ERROR_USER_INACTIVE = 'error_user_inactive';
+  const ERROR_ANOTHER_USER_CONNECTED = 'error_another_user_connected';
+
+  /**
+   * Possible authorization error messages.
+   *
+   * @var \Drupal\Component\Render\MarkupInterface[]
+   */
+  protected $authorizationErrorMessages = [];
 
   /**
    * Construct an instance of the OpenID Connect service.
@@ -214,6 +247,54 @@ class OpenIDConnect {
       return FALSE;
     }
     return $user_data['sub'];
+  }
+
+  /**
+   * Set authorization state and optionally display an error message.
+   *
+   * @param string $authorization_state
+   *   Should be one of the class state constants.
+   * @param \Drupal\Component\Render\MarkupInterface|null $error_message
+   *   An optional error message to display to user.
+   */
+  protected function setAuthorizationState(string $authorization_state, MarkupInterface $error_message = NULL) {
+    $this->authorizationState = $authorization_state;
+
+    // Reset messages on a new attempt.
+    if ($authorization_state === self::ATTEMPTING_AUTHORIZATION) {
+      $this->authorizationErrorMessages = [];
+    }
+
+    // Add the error to stack if provided.
+    if (!empty($error_message)) {
+      $this->authorizationErrorMessages[] = $error_message;
+    }
+  }
+
+  /**
+   * Get authorization state constant.
+   *
+   * Note that if multiple authorizations are attempted, this will only
+   * reflect the state of the last one.
+   *
+   * @return string
+   *   Value of the class constant representing the state of last authorization.
+   */
+  public function getAuthorizationState() : string {
+    return $this->authorizationState;
+  }
+
+  /**
+   * Get authorization error messages.
+   *
+   * Note that if multiple authorizations are attempted, this will only
+   * reflect the errors of the last one.
+   *
+   * @return \Drupal\Component\Render\MarkupInterface[]
+   *   Error messages for the last authorization attempt.
+   */
+  public function getAuthorizationErrorMessages() : array {
+    return $this->authorizationErrorMessages;
   }
 
   /**
