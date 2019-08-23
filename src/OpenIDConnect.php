@@ -316,6 +316,12 @@ class OpenIDConnect {
       throw new \RuntimeException('User already logged in');
     }
 
+    $this->setAuthorizationState(self::ATTEMPTING_AUTHORIZATION);
+
+    $common_error_context = [
+      '@provider' => $client->getPluginId(),
+    ];
+
     $user_data = $client->decodeIdToken($tokens['id_token']);
     $userinfo = $client->retrieveUserInfo($tokens['access_token']);
 
@@ -330,6 +336,10 @@ class OpenIDConnect {
       $message = 'No e-mail address provided by @provider';
       $variables = ['@provider' => $client->getPluginId()];
       $this->logger->error($message . ' (@code @error). Details: @details', $variables);
+      $this->setAuthorizationState(
+        self::ERROR_AUTHORIZATION_FAILED,
+        $this->t('Logging in with @provider could not be completed due to an error.', $common_error_context)
+      );
       return FALSE;
     }
 
@@ -338,6 +348,10 @@ class OpenIDConnect {
       $message = 'No "sub" found from @provider';
       $variables = ['@provider' => $client->getPluginId()];
       $this->logger->error($message . ' (@code @error). Details: @details', $variables);
+      $this->setAuthorizationState(
+        self::ERROR_AUTHORIZATION_FAILED,
+        $this->t('Logging in with @provider could not be completed due to an error.', $common_error_context)
+      );
       return FALSE;
     }
 
@@ -360,6 +374,10 @@ class OpenIDConnect {
       $message = 'Login denied for @email via pre-authorize hook.';
       $variables = ['@email' => $userinfo['email']];
       $this->logger->error($message, $variables);
+      $this->setAuthorizationState(
+        self::ERROR_AUTHORIZATION_DENIED,
+        $this->t('Logging in with @provider was denied.', $common_error_context)
+      );
       return FALSE;
     }
 
@@ -388,9 +406,11 @@ class OpenIDConnect {
     else {
       // Check whether the e-mail address is valid.
       if (!$this->emailValidator->isValid($userinfo['email'])) {
-        $this->messenger->addError($this->t('The e-mail address is not valid: @email', [
-          '@email' => $userinfo['email'],
-        ]));
+        $error_context = $common_error_context + ['@email' => $userinfo['email']];
+        $this->setAuthorizationState(
+          self::ERROR_INVALID_EMAIL,
+          $this->t('Logging in with @provider could not be completed due to an invalid email address: @email.', $error_context)
+        );
         return FALSE;
       }
 
@@ -407,9 +427,10 @@ class OpenIDConnect {
           $this->authmap->createAssociation($account, $client->getPluginId(), $sub);
         }
         else {
-          $this->messenger->addError($this->t('The e-mail address is already taken: @email', [
-            '@email' => $userinfo['email'],
-          ]));
+          $this->setAuthorizationState(
+            self::ERROR_EMAIL_TAKEN,
+            $this->t('The e-mail address is already taken: @email', ['@email' => $userinfo['email']])
+          );
           return FALSE;
         }
       }
@@ -428,7 +449,10 @@ class OpenIDConnect {
         switch ($register) {
           case USER_REGISTER_ADMINISTRATORS_ONLY:
             // Deny user registration.
-            $this->messenger->addError($this->t('Only administrators can register new accounts.'));
+            $this->setAuthorizationState(
+              self::ERROR_REGISTRATION_RESTRICTED,
+              $this->t('Only administrators can register new accounts.')
+            );
             return FALSE;
 
           case USER_REGISTER_VISITORS:
@@ -461,11 +485,10 @@ class OpenIDConnect {
     // Whether the user should not be logged in due to pending administrator
     // approval.
     if ($account->isBlocked()) {
-      if (empty($context['is_new'])) {
-        $this->messenger->addError($this->t('The username %name has not been activated or is blocked.', [
-          '%name' => $account->getAccountName(),
-        ]));
-      }
+      $this->setAuthorizationState(
+        self::ERROR_USER_INACTIVE,
+        $this->t('The username %name has not been activated or is blocked.', ['%name' => $account->getAccountName()])
+      );
       return FALSE;
     }
 
@@ -486,6 +509,7 @@ class OpenIDConnect {
       ]
     );
 
+    $this->setAuthorizationState(self::SUCCESSFULL_LOGIN);
     return TRUE;
   }
 
