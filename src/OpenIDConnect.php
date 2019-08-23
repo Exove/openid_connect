@@ -530,6 +530,12 @@ class OpenIDConnect {
       throw new \RuntimeException('User not logged in');
     }
 
+    $this->setAuthorizationState(self::ATTEMPTING_AUTHORIZATION);
+
+    $common_error_context = [
+      '@provider' => $client->getPluginId(),
+    ];
+
     /* @var \Drupal\openid_connect\Authmap $authmap */
     $user_data = $client->decodeIdToken($tokens['id_token']);
     $userinfo = $client->retrieveUserInfo($tokens['access_token']);
@@ -549,6 +555,10 @@ class OpenIDConnect {
       $message = 'No e-mail address provided by @provider';
       $variables = $provider_param;
       $this->logger->error($message . ' (@code @error). Details: @details', $variables);
+      $this->setAuthorizationState(
+        self::ERROR_AUTHORIZATION_FAILED,
+        $this->t('Connecting with @provider could not be completed due to an error.', $common_error_context)
+      );
       return FALSE;
     }
 
@@ -557,6 +567,10 @@ class OpenIDConnect {
       $message = 'No "sub" found from @provider';
       $variables = $provider_param;
       $this->logger->error($message . ' (@code @error). Details: @details', $variables);
+      $this->setAuthorizationState(
+        self::ERROR_AUTHORIZATION_FAILED,
+        $this->t('Connecting with @provider could not be completed due to an error.', $common_error_context)
+      );
       return FALSE;
     }
 
@@ -579,6 +593,10 @@ class OpenIDConnect {
       $message = 'Login denied for @email via pre-authorize hook.';
       $variables = ['@email' => $userinfo['email']];
       $this->logger->error($message, $variables);
+      $this->setAuthorizationState(
+        self::ERROR_AUTHORIZATION_DENIED,
+        $this->t('Connecting with @provider was denied.', $common_error_context)
+      );
       return FALSE;
     }
 
@@ -591,7 +609,10 @@ class OpenIDConnect {
     }
 
     if ($account && $account->id() !== $this->currentUser->id()) {
-      $this->messenger->addError($this->t('Another user is already connected to this @provider account.', $provider_param));
+      $this->setAuthorizationState(
+        self::ERROR_ANOTHER_USER_CONNECTED,
+        $this->t('Another user is already connected to this @provider account.', $common_error_context)
+      );
       return FALSE;
     }
 
@@ -627,6 +648,7 @@ class OpenIDConnect {
       ]
     );
 
+    $this->setAuthorizationState(self::SUCCESSFULL_CONNECTION);
     return TRUE;
   }
 

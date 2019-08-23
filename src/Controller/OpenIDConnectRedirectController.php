@@ -185,9 +185,6 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
           if ($success) {
             $this->messenger()->addStatus($this->t('Account successfully connected with @provider.', $provider_param));
           }
-          else {
-            $this->messenger()->addError($this->t('Connecting with @provider could not be completed due to an error.', $provider_param));
-          }
         }
         // Show errors if an authorization was attempted and it failed.
         if (FALSE === $success) {
