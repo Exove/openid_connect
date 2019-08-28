@@ -16,6 +16,7 @@ use Exception;
 use GuzzleHttp\ClientInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Base class for OpenID Connect client plugins.
@@ -198,20 +199,30 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
   /**
    * Implements OpenIDConnectClientInterface::getEndpoints().
    */
-  public function getEndpoints() {
+  public function getEndpoints() : array {
     throw new Exception('Unimplemented method getEndpoints().');
+    // Eliminate complaints about no return statement.
+    // @codingStandardsIgnoreStart
+    return [];
+    // @codingStandardsIgnoreEnd
   }
 
   /**
    * Implements OpenIDConnectClientInterface::authorize().
    *
-   * @param string $scope
+   * @param string|null $scope
    *   A string of scopes.
    *
    * @return \Drupal\Core\Routing\TrustedRedirectResponse
    *   A trusted redirect response object.
+   *   The OpenIDConnectClientInterface requires the return type to be
+   *   \Symfony\Component\HttpFoundation\Response , so that is used
+   *   for the return type declaration, but
+   *   \Drupal\Core\Routing\TrustedRedirectResponse is a subclass of that.
+   *   This mismatch between the documented and declared types can be
+   *   fixed in PHP 7.4.
    */
-  public function authorize($scope = 'openid email') {
+  public function authorize(?string $scope = 'openid email') : Response {
     $language_none = \Drupal::languageManager()
       ->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
     $redirect_uri = Url::fromRoute(
@@ -252,13 +263,15 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
   /**
    * Implements OpenIDConnectClientInterface::retrieveIDToken().
    *
+   * {@inheritdoc}
+   *
    * @param string $authorization_code
    *   A authorization code string.
    *
-   * @return array|bool
-   *   A result array or false.
+   * @return array|null
+   *   A result array or NULL on failure.
    */
-  public function retrieveTokens($authorization_code) {
+  public function retrieveTokens(string $authorization_code) : ?array {
     // Exchange `code` for access token and ID token.
     $language_none = \Drupal::languageManager()
       ->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
@@ -293,6 +306,11 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
       $response = $client->post($endpoints['token'], $request_options);
       $response_data = json_decode((string) $response->getBody(), TRUE);
 
+      // Make sure the result is an array.
+      if (!is_array($response_data)) {
+        return NULL;
+      }
+
       // Expected result.
       $tokens = [
         'id_token' => isset($response_data['id_token']) ? $response_data['id_token'] : NULL,
@@ -313,32 +331,47 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
       ];
       $this->loggerFactory->get('openid_connect_' . $this->pluginId)
         ->error('@message. Details: @error_message', $variables);
-      return FALSE;
+      return NULL;
     }
   }
 
   /**
    * Implements OpenIDConnectClientInterface::decodeIdToken().
+   *
+   * {@inheritdoc}
    */
-  public function decodeIdToken($id_token) {
+  public function decodeIdToken(?string $id_token = NULL) : ?array {
+    if (empty($id_token)) {
+      return NULL;
+    }
     // @codingStandardsIgnoreStart
     list($headerb64, $claims64, $signatureb64) = explode('.', $id_token);
     // @codingStandardsIgnoreEnd
     $claims64 = str_replace(['-', '_'], ['+', '/'], $claims64);
     $claims64 = base64_decode($claims64);
-    return json_decode($claims64, TRUE);
+    $claims = json_decode($claims64, TRUE);
+    // Make sure the result is an array before returning it.
+    if (!is_array($claims)) {
+      return NULL;
+    }
+    return $claims;
   }
 
   /**
    * Implements OpenIDConnectClientInterface::retrieveUserInfo().
    *
-   * @param string $access_token
+   * {@inheritdoc}
+   *
+   * @param string|null $access_token
    *   An access token string.
    *
-   * @return array|bool
-   *   A result array or false.
+   * @return array|null
+   *   A result array or NULL on failure.
    */
-  public function retrieveUserInfo($access_token) {
+  public function retrieveUserInfo(?string $access_token = NULL) : ?array {
+    if (empty($access_token)) {
+      return NULL;
+    }
     $request_options = [
       'headers' => [
         'Authorization' => 'Bearer ' . $access_token,
@@ -352,7 +385,12 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
       $response = $client->get($endpoints['userinfo'], $request_options);
       $response_data = (string) $response->getBody();
 
-      return json_decode($response_data, TRUE);
+      // Make sure the result is an array before returning it.
+      $userinfo = json_decode($response_data, TRUE);
+      if (!is_array($userinfo)) {
+        return NULL;
+      }
+      return $userinfo;
     }
     catch (Exception $e) {
       $variables = [
@@ -361,7 +399,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
       ];
       $this->loggerFactory->get('openid_connect_' . $this->pluginId)
         ->error('@message. Details: @error_message', $variables);
-      return FALSE;
+      return NULL;
     }
   }
 

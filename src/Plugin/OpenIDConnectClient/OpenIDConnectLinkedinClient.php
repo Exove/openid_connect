@@ -4,6 +4,7 @@ namespace Drupal\openid_connect\Plugin\OpenIDConnectClient;
 
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\openid_connect\Plugin\OpenIDConnectClientBase;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * LinkedIn OpenID Connect client.
@@ -34,7 +35,7 @@ class OpenIDConnectLinkedinClient extends OpenIDConnectClientBase {
   /**
    * {@inheritdoc}
    */
-  public function getEndpoints() {
+  public function getEndpoints() : array {
     return [
       'authorization' => 'https://www.linkedin.com/oauth/v2/authorization',
       'token' => 'https://www.linkedin.com/oauth/v2/accessToken',
@@ -45,7 +46,7 @@ class OpenIDConnectLinkedinClient extends OpenIDConnectClientBase {
   /**
    * {@inheritdoc}
    */
-  public function authorize($scope = 'openid email') {
+  public function authorize(?string $scope = 'openid email') : Response {
     // Use LinkedIn specific authorisations.
     return parent::authorize('r_basicprofile r_emailaddress');
   }
@@ -53,14 +54,14 @@ class OpenIDConnectLinkedinClient extends OpenIDConnectClientBase {
   /**
    * {@inheritdoc}
    */
-  public function decodeIdToken($id_token) {
-    return NULL;
+  public function decodeIdToken(?string $id_token = NULL) : ?array {
+    return [];
   }
 
   /**
    * {@inheritdoc}
    */
-  public function retrieveUserInfo($access_token) {
+  public function retrieveUserInfo(?string $access_token = NULL) : ?array {
     $userinfo = parent::retrieveUserInfo($access_token);
 
     if ($userinfo) {
