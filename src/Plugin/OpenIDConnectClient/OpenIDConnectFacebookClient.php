@@ -138,4 +138,23 @@ class OpenIDConnectFacebookClient extends OpenIDConnectClientBase {
     }
   }
 
+  /**
+   * Bypass sub validation because this plugin is not using OpenID Connect.
+   *
+   * See OpenIDConnectClientInterface::byPassSubValidation() for
+   * details on the subject and its security implications.
+   *
+   * {@inheritDoc}
+   *
+   * @return bool
+   *   Whether to require that both the ID Token and UserInfo contain a
+   *   sub claim that is nonempty and equal in both.
+   *
+   * @see \Drupal\openid_connect\Plugin\OpenIdConnectClientInterface::byPassSubValidation()
+   * @see https://www.drupal.org/project/openid_connect/issues/2999862
+   */
+  public function byPassSubValidation(): bool {
+    return TRUE;
+  }
+
 }
