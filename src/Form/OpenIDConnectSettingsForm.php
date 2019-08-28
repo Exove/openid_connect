@@ -310,6 +310,10 @@ class OpenIDConnectSettingsForm extends ConfigFormBase implements ContainerInjec
 
       ksort($definitions);
       foreach ($definitions as $client_name => $client_plugin) {
+        // The stateless client wrapper is not a standalone client, so hide it.
+        if ($client_name === 'stateless_client_wrapper') {
+          continue;
+        }
         $configuration = $this->configFactory()
           ->getEditable('openid_connect.settings.' . $client_name)
           ->get('settings');
