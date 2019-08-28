@@ -16,6 +16,7 @@ use Drupal\user\UserDataInterface;
 use Drupal\user\UserInterface;
 use Drupal\Component\Utility\EmailValidatorInterface;
 use Drupal\Component\Render\MarkupInterface;
+use Drupal\openid_connect\Plugin\OpenIDConnectClientManager;
 
 /**
  * Main service of the OpenID Connect module.
@@ -94,6 +95,13 @@ class OpenIDConnect {
   protected $logger;
 
   /**
+   * OpenID Connect Client Plugin Manager.
+   *
+   * @var \Drupal\openid_connect\Plugin\OpenIDConnectClientManager
+   */
+  protected $pluginManager;
+
+  /**
    * State of the authorization.
    *
    * @var string
@@ -148,6 +156,8 @@ class OpenIDConnect {
    *   The module handler.
    * @param \Drupal\Core\Logger\LoggerChannelFactoryInterface $logger
    *   A logger channel factory instance.
+   * @param \Drupal\openid_connect\Plugin\OpenIDConnectClientManager $plugin_manager
+   *   OpenID Connect Client Plugin Manager.
    */
   public function __construct(
     ConfigFactoryInterface $config_factory,
@@ -159,7 +169,8 @@ class OpenIDConnect {
     EmailValidatorInterface $email_validator,
     MessengerInterface $messenger,
     ModuleHandler $module_handler,
-    LoggerChannelFactoryInterface $logger
+    LoggerChannelFactoryInterface $logger,
+    OpenIDConnectClientManager $plugin_manager
   ) {
     $this->configFactory = $config_factory;
     $this->authmap = $authmap;
@@ -171,6 +182,7 @@ class OpenIDConnect {
     $this->messenger = $messenger;
     $this->moduleHandler = $module_handler;
     $this->logger = $logger->get('openid_connect');
+    $this->pluginManager = $plugin_manager;
   }
 
   /**
