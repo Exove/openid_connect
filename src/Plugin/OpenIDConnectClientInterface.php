@@ -105,4 +105,29 @@ interface OpenIDConnectClientInterface extends ConfigurablePluginInterface, Plug
    */
   public function retrieveUserInfo(?string $access_token = NULL) : ?array;
 
+  /**
+   * Whether to bypass sub validation or not when using this client.
+   *
+   * The OpenID Connect specification REQUIRES that an ID Token containing
+   * a MANDATORY 'sub' claim is present in the response from the Token
+   * endpoint. However, this is not currently required by the module as
+   * long as it is present in the UserInfo, or injected there by
+   * hook_openid_connect_userinfo_alter(), and the module already provides
+   * plugins that are using Oauth or custom protocols instead of
+   * OpenID Connect.
+   *
+   * When using OpenID Connect, not verifying that the sub claim of the
+   * UserInfo response equals the sub claim of the ID Token opens up the
+   * the possibility of token substitution attacks. For this reason, DO NOT
+   * return TRUE from this method unless your plugin is a wrapper around
+   * another protocol.
+   *
+   * @return bool
+   *   Whether to require that both the ID Token and UserInfo contain a
+   *   sub claim that is nonempty and equal in both.
+   *
+   * @see https://www.drupal.org/project/openid_connect/issues/2999862
+   */
+  public function byPassSubValidation() : bool;
+
 }

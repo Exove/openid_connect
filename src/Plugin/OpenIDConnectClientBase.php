@@ -46,6 +46,19 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
   protected $loggerFactory;
 
   /**
+   * Whether sub validation should be bypassed for this client.
+   *
+   * See OpenIDConnectClientInterface::byPassSubValidation() for
+   * details on the subject and its security implications.
+   *
+   * @var bool
+   *
+   * @see \Drupal\openid_connect\Plugin\OpenIdConnectClientInterface::byPassSubValidation()
+   * @see https://www.drupal.org/project/openid_connect/issues/2999862
+   */
+  protected $byPassSubValidation = FALSE;
+
+  /**
    * The constructor.
    *
    * @param array $configuration
@@ -401,6 +414,25 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
         ->error('@message. Details: @error_message', $variables);
       return NULL;
     }
+  }
+
+  /**
+   * Whether to bypass sub validation. Returning TRUE may be dangerous.
+   *
+   * See OpenIDConnectClientInterface::byPassSubValidation() for
+   * details on the subject and its security implications.
+   *
+   * {@inheritDoc}
+   *
+   * @return bool
+   *   Whether to require that both the ID Token and UserInfo contain a
+   *   sub claim that is nonempty and equal in both.
+   *
+   * @see \Drupal\openid_connect\Plugin\OpenIdConnectClientInterface::byPassSubValidation()
+   * @see https://www.drupal.org/project/openid_connect/issues/2999862
+   */
+  public function byPassSubValidation(): bool {
+    return $this->byPassSubValidation;
   }
 
 }
