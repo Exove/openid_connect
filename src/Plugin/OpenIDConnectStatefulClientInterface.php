@@ -81,12 +81,21 @@ interface OpenIDConnectStatefulClientInterface extends OpenIDConnectClientInterf
    * Authorize and Token end points must provide the same sub, if both are used.
    * It also MUST NOT exceed 255 characters in length.
    *
+   * An important thing to note is that the default implementation provided by
+   * OpenIDConnectStatefulClientBase does not respect
+   * OpenIDConnectClientInterface::byPassSubValidation() which is only intended
+   * to minimize the hassle related to supporting existing client plugins that
+   * do not implement OpenID Connect.
+   *
    * @return bool
    *   FALSE if not valid, TRUE if valid.
    *
    * @throws Exception
    *   Throws an Exception if ID Token has not been decoded or UserInfo
    *   has not been fetched.
+   *
+   * @see OpenIDConnectStatefulClientBase::validateSub()
+   * @see OpenIDConnectStatelessClientWrapper::fetchUserInfo()
    */
   public function validateSub() : bool;
 
