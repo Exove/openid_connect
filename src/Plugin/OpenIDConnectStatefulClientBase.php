@@ -144,7 +144,8 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
    * information.
    *
    * For the actual fetching of tokens, see
-   * OpenIDConnectStatefulClientBase::fetchTokens();
+   * OpenIDConnectStatefulClientBase::fetchTokens(). Multiple calls to this
+   * method do not cause the tokens to be refetched.
    *
    * @param string $authorization_code
    *   Authorization code received as a result of the the authorization request.
@@ -161,6 +162,10 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
    */
   final public function retrieveTokens(string $authorization_code) : ?array {
     $this->code = $authorization_code;
+    // Don't fetch tokens again if we already have them.
+    if (is_array($this->tokens)) {
+      return $this->tokens;
+    }
     $tokens = $this->fetchTokens();
     if (empty($tokens) || empty($tokens['id_token']) || empty($tokens['access_token'])) {
       return NULL;
@@ -168,6 +173,16 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     $this->tokens = $tokens;
     $this->originalIdToken = $this->tokens['id_token'];
     $this->accessToken = $this->tokens['access_token'];
+    return $this->tokens;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getTokens() : array {
+    if (!is_array($this->tokens)) {
+      throw new Exception("Tokens have not been fetched.");
+    }
     return $this->tokens;
   }
 
