@@ -19,7 +19,13 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Base class for OpenID Connect client plugins.
+ * Base class for stateless OpenID Connect client plugins.
+ *
+ * New client plugins should extend OpenIDConnectStatefulClientBase instead.
+ *
+ * @see OpenIDConnectStatefulClientInterface
+ * @see OpenIDConnectStatefulClientBase
+ * @see https://www.drupal.org/project/openid_connect/issues/3076619
  */
 abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConnectClientInterface, ContainerFactoryPluginInterface {
   use StringTranslationTrait;
