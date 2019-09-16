@@ -16,6 +16,18 @@ use Drupal\user\UserInterface;
 interface OpenIDConnectStatefulClientInterface extends OpenIDConnectClientInterface {
 
   /**
+   * Get the unaltered tokens as fetched by retrieveTokens().
+   *
+   * @return array
+   *   The tokens as originally retrieved by
+   *   OpenIDConnectClientInterface::retrieveTokens().
+   *
+   * @throws Exception
+   *   Throws an Exception if tokens have not been fetched.
+   */
+  public function getTokens() : array;
+
+  /**
    * Decodes ID token to access user data.
    *
    * @param string|null $id_token
