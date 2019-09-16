@@ -284,6 +284,16 @@ class OpenIDConnect {
   }
 
   /**
+   * Add an authorization error message without changing the state.
+   *
+   * @param \Drupal\Component\Render\MarkupInterface $error_message
+   *   The error message to add.
+   */
+  protected function addAuthorizationErrorMessage(MarkupInterface $error_message) {
+    $this->authorizationErrorMessages[] = $error_message;
+  }
+
+  /**
    * Get authorization state constant.
    *
    * Note that if multiple authorizations are attempted, this will only
