@@ -90,24 +90,19 @@ class OpenIDConnectStatelessClientWrapper extends OpenIDConnectStatefulClientBas
   }
 
   /**
-   * Get the Plugin Id appended with the id of the plugin wrapped around if set.
+   * Get the Plugin Id of the stateless client wrapped around if there is one.
+   *
+   * If the wrapper has not been initialized with a stateless plugin, the plugin
+   * id of the wrapper itself is returned.
    *
    * @return string
-   *   Plugin Id appended with the id of the plugin wrapped around if set.
+   *   Plugin Id of the stateless client if set, or the wrapper's id if not.
    */
   public function getPluginId() {
-    return $this->statelessClient ? $this->pluginId . '_' . $this->statelessClient->pluginId : $this->pluginId;
-  }
-
-  /**
-   * Get the Plugin Id of the stateless client wrapped around.
-   *
-   * @return string
-   *   Plugin Id of the stateless client wrapped around.
-   */
-  public function getStatelessPluginId() : string {
-    $this->requireStatelessClient();
-    return $this->statelessClient->getPluginId();
+    if (!empty($this->statelessClient)) {
+      return $this->statelessClient->getPluginId();
+    }
+    return $this->pluginId;
   }
 
   /**
