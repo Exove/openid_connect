@@ -180,6 +180,28 @@ class OpenIDConnectStatelessClientWrapper extends OpenIDConnectStatefulClientBas
     }
     $this->originalUserInfo = $userinfo;
     $this->userInfo = $userinfo;
+    // If we are wrapping around a client that is not actually implementing
+    // OpenID Connect, and the client explicitly foregoes sub validation,
+    // fake the sub for the client, as long as there is one in UserInfo, and
+    // there is not one already from the ID Token.
+    if ($this->statelessClient->byPassSubValidation()) {
+      if (!empty($userinfo['sub'])) {
+        $sub_userinfo = $userinfo['sub'];
+        if (!empty($this->idToken['sub'])) {
+          // This is obviously an error worthy of loggin, but give the regular
+          // sub validation a chance.
+          $this->getLogger()->error(
+            "Bypassing of sub validation was requested by @provider, but sub was included in the ID Token.",
+            ['@provider' => $this->getPluginId()]
+          );
+        }
+        else {
+          // Fullfill the requirement of identical subs in ID Token and
+          // Userinfo by injecting it into Userinfo.
+          $this->idToken['sub'] = $sub_userinfo;
+        }
+      }
+    }
     // If sub in the UserInfo does not match the sub in the ID Token,
     // UserInfo response MUST NOT be used.
     if (!$this->validateSub()) {
