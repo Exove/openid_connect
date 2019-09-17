@@ -338,80 +338,26 @@ class OpenIDConnect {
     if ($this->currentUser->isAuthenticated()) {
       throw new \RuntimeException('User already logged in');
     }
-
-    $this->setAuthorizationState(self::ATTEMPTING_AUTHORIZATION);
-
+    // Common context for error messages.
     $common_error_context = [
       '@provider' => $client->getPluginId(),
     ];
-
-    $user_data = $client->decodeIdToken($tokens['id_token']);
-    $userinfo = $client->retrieveUserInfo($tokens['access_token']);
-
-    $context = [
-      'tokens' => $tokens,
-      'plugin_id' => $client->getPluginId(),
-      'user_data' => $user_data,
-    ];
-    $this->moduleHandler->alter('openid_connect_userinfo', $userinfo, $context);
-
-    if ($userinfo && empty($userinfo['email'])) {
-      $message = 'No e-mail address provided by @provider';
-      $variables = ['@provider' => $client->getPluginId()];
-      $this->logger->error($message . ' (@code @error). Details: @details', $variables);
-      $this->setAuthorizationState(
-        self::ERROR_AUTHORIZATION_FAILED,
-        $this->t('Logging in with @provider could not be completed due to an error.', $common_error_context)
-      );
+    $default_error = $this->t('Logging in with @provider could not be completed due to an error.', $common_error_context);
+    // Replace stateless clients with a stateful wrapper.
+    $client = $this->getStatefulClient($client, $tokens);
+    // Validate the authorization and get a possible user from it.
+    /* @var \Drupal\user\UserInterface|null $account */
+    $account = $this->validateAuthorization($client);
+    // Abort if there was an error.
+    if ($this->getAuthorizationState() !== self::ATTEMPTING_AUTHORIZATION) {
+      // Add an error message.
+      $this->addAuthorizationErrorMessage($default_error);
       return FALSE;
     }
 
-    $sub = $this->extractSub($user_data, $userinfo, $client->byPassSubValidation());
-    if (empty($sub)) {
-      $message = 'No "sub" found from @provider';
-      $variables = ['@provider' => $client->getPluginId()];
-      $this->logger->error($message . ' (@code @error). Details: @details', $variables);
-      $this->setAuthorizationState(
-        self::ERROR_AUTHORIZATION_FAILED,
-        $this->t('Logging in with @provider could not be completed due to an error.', $common_error_context)
-      );
-      return FALSE;
-    }
-
-    /* @var \Drupal\user\UserInterface $account */
-    $account = $this->authmap->userLoadBySub($sub, $client->getPluginId());
-    $context = [
-      'tokens' => $tokens,
-      'plugin_id' => $client->getPluginId(),
-      'user_data' => $user_data,
-      'userinfo' => $userinfo,
-      'sub' => $sub,
-    ];
-    $results = $this->moduleHandler->invokeAll('openid_connect_pre_authorize', [
-      $account,
-      $context,
-    ]);
-
-    // Deny access if any module returns FALSE.
-    if (in_array(FALSE, $results, TRUE)) {
-      $message = 'Login denied for @email via pre-authorize hook.';
-      $variables = ['@email' => $userinfo['email']];
-      $this->logger->error($message, $variables);
-      $this->setAuthorizationState(
-        self::ERROR_AUTHORIZATION_DENIED,
-        $this->t('Logging in with @provider was denied.', $common_error_context)
-      );
-      return FALSE;
-    }
-
-    // If any module returns an account, set local $account to that.
-    foreach ($results as $result) {
-      if ($result instanceof UserInterface) {
-        $account = $result;
-        break;
-      }
-    }
-
+    $user_data = $client->getDecodedIdToken();
+    $userinfo = $client->getUserInfo();
+    $sub = $client->getSub();
     if ($account) {
       // An existing account was found. Save user claims.
       if ($this->configFactory->get('openid_connect.settings')->get('always_save_userinfo')) {
@@ -552,84 +498,26 @@ class OpenIDConnect {
     if (!$this->currentUser->isAuthenticated()) {
       throw new \RuntimeException('User not logged in');
     }
-
-    $this->setAuthorizationState(self::ATTEMPTING_AUTHORIZATION);
-
+    // Common context for error messages.
     $common_error_context = [
       '@provider' => $client->getPluginId(),
     ];
-
-    /* @var \Drupal\openid_connect\Authmap $authmap */
-    $user_data = $client->decodeIdToken($tokens['id_token']);
-    $userinfo = $client->retrieveUserInfo($tokens['access_token']);
-
-    $context = [
-      'tokens' => $tokens,
-      'plugin_id' => $client->getPluginId(),
-      'user_data' => $user_data,
-    ];
-    $this->moduleHandler->alter('openid_connect_userinfo', $userinfo, $context);
-
-    $provider_param = [
-      '@provider' => $client->getPluginId(),
-    ];
-
-    if ($userinfo && empty($userinfo['email'])) {
-      $message = 'No e-mail address provided by @provider';
-      $variables = $provider_param;
-      $this->logger->error($message . ' (@code @error). Details: @details', $variables);
-      $this->setAuthorizationState(
-        self::ERROR_AUTHORIZATION_FAILED,
-        $this->t('Connecting with @provider could not be completed due to an error.', $common_error_context)
-      );
+    $default_error = $this->t('Connecting with @provider could not be completed due to an error.', $common_error_context);
+    // Replace stateless clients with a stateful wrapper.
+    $client = $this->getStatefulClient($client, $tokens);
+    // Validate the authorization and get a possible user from it.
+    /* @var \Drupal\user\UserInterface|null $account */
+    $account = $this->validateAuthorization($client);
+    // Abort if there was an error.
+    if ($this->getAuthorizationState() !== self::ATTEMPTING_AUTHORIZATION) {
+      // Add an error message.
+      $this->addAuthorizationErrorMessage($default_error);
       return FALSE;
     }
 
-    $sub = $this->extractSub($user_data, $userinfo, $client->byPassSubValidation());
-    if (empty($sub)) {
-      $message = 'No "sub" found from @provider';
-      $variables = $provider_param;
-      $this->logger->error($message . ' (@code @error). Details: @details', $variables);
-      $this->setAuthorizationState(
-        self::ERROR_AUTHORIZATION_FAILED,
-        $this->t('Connecting with @provider could not be completed due to an error.', $common_error_context)
-      );
-      return FALSE;
-    }
-
-    /* @var \Drupal\user\UserInterface $account */
-    $account = $this->authmap->userLoadBySub($sub, $client->getPluginId());
-    $context = [
-      'tokens' => $tokens,
-      'plugin_id' => $client->getPluginId(),
-      'user_data' => $user_data,
-      'userinfo' => $userinfo,
-      'sub' => $sub,
-    ];
-    $results = $this->moduleHandler->invokeAll('openid_connect_pre_authorize', [
-      $account,
-      $context,
-    ]);
-
-    // Deny access if any module returns FALSE.
-    if (in_array(FALSE, $results, TRUE)) {
-      $message = 'Login denied for @email via pre-authorize hook.';
-      $variables = ['@email' => $userinfo['email']];
-      $this->logger->error($message, $variables);
-      $this->setAuthorizationState(
-        self::ERROR_AUTHORIZATION_DENIED,
-        $this->t('Connecting with @provider was denied.', $common_error_context)
-      );
-      return FALSE;
-    }
-
-    // If any module returns an account, set local $account to that.
-    foreach ($results as $result) {
-      if ($result instanceof UserInterface) {
-        $account = $result;
-        break;
-      }
-    }
+    $user_data = $client->getDecodedIdToken();
+    $userinfo = $client->getUserInfo();
+    $sub = $client->getSub();
 
     if ($account && $account->id() !== $this->currentUser->id()) {
       $this->setAuthorizationState(
