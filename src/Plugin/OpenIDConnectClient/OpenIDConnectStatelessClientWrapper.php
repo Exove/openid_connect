@@ -4,6 +4,7 @@ namespace Drupal\openid_connect\Plugin\OpenIDConnectClient;
 
 use Drupal\openid_connect\Plugin\OpenIDConnectClientInterface;
 use Drupal\openid_connect\Plugin\OpenIDConnectStatefulClientBase;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Wrapper for stateless OpenID Connect clients.
@@ -109,7 +110,7 @@ class OpenIDConnectStatelessClientWrapper extends OpenIDConnectStatefulClientBas
   /**
    * {@inheritdoc}
    */
-  public function getEndpoints() {
+  public function getEndpoints() : array {
     $this->requireStatelessClient();
     return $this->statelessClient->getEndpoints();
   }
@@ -125,7 +126,7 @@ class OpenIDConnectStatelessClientWrapper extends OpenIDConnectStatefulClientBas
   /**
    * {@inheritdoc}
    */
-  public function authorize($scope = 'openid email') {
+  public function authorize(?string $scope = 'openid email') : Response {
     $this->requireStatelessClient();
     return $this->statelessClient->authorize($scope);
   }
