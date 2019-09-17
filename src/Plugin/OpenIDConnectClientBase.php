@@ -203,6 +203,33 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
   }
 
   /**
+   * Get URL options for the Authorization endpoint.
+   *
+   * @param string $scope
+   *   A string of scopes.
+   * @param \Drupal\Core\Url $redirect_uri
+   *   The redirect Url.
+   *
+   * @return array
+   *   An array of options for generating the full Authorization endpoint URL.
+   *
+   * @todo Add a nonce, save it and verify it afterwards.
+   * @todo Add encryption and/or signing of query depending on client settings.
+   */
+  protected function getUrlOptions(string $scope, Url $redirect_uri) : array {
+    $url_options = [
+      'query' => [
+        'client_id' => $this->configuration['client_id'],
+        'response_type' => 'code',
+        'scope' => $scope,
+        'redirect_uri' => $redirect_uri->getGeneratedUrl(),
+        'state' => OpenIDConnectStateToken::create(),
+      ],
+    ];
+    return $url_options;
+  }
+
+  /**
    * Implements OpenIDConnectClientInterface::authorize().
    *
    * @param string $scope
@@ -225,15 +252,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
       ]
     )->toString(TRUE);
 
-    $url_options = [
-      'query' => [
-        'client_id' => $this->configuration['client_id'],
-        'response_type' => 'code',
-        'scope' => $scope,
-        'redirect_uri' => $redirect_uri->getGeneratedUrl(),
-        'state' => OpenIDConnectStateToken::create(),
-      ],
-    ];
+    $url_options = $this->getUrlOptions($scope, $redirect_uri);
 
     $endpoints = $this->getEndpoints();
     // Clear _GET['destination'] because we need to override it.
