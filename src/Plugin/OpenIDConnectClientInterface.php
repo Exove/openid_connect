@@ -23,6 +23,19 @@ interface OpenIDConnectClientInterface extends ConfigurablePluginInterface, Plug
   public function getEndpoints();
 
   /**
+   * Gets an array of of scopes.
+   *
+   * This method allows a client to override the default minimum set of scopes
+   * assumed by OpenIDConnectClaims::getScopes();
+   *
+   * @return array|null
+   *   An array of scopes or NULL to use defaults.
+   *
+   * @see \Drupal\openid_connect\OpenIDConnectClaims::getScopes()
+   */
+  public function getClientScopes() : ?array;
+
+  /**
    * Redirects the user to the authorization endpoint.
    *
    * The authorization endpoint authenticates the user and returns them
