@@ -34,7 +34,7 @@ class OpenIDConnectGoogleClient extends OpenIDConnectClientBase {
   /**
    * {@inheritdoc}
    */
-  public function getEndpoints() {
+  public function getEndpoints() : array {
     return [
       'authorization' => 'https://accounts.google.com/o/oauth2/auth',
       'token' => 'https://accounts.google.com/o/oauth2/token',
@@ -45,7 +45,7 @@ class OpenIDConnectGoogleClient extends OpenIDConnectClientBase {
   /**
    * {@inheritdoc}
    */
-  public function retrieveUserInfo($access_token) {
+  public function retrieveUserInfo(?string $access_token = NULL) : ?array {
     $userinfo = parent::retrieveUserInfo($access_token);
     if ($userinfo) {
       // For some reason Google returns the URI of the profile picture in a
