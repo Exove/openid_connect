@@ -159,7 +159,7 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
       ])) {
         // If we have an one of the above errors, that means the user hasn't
         // granted the authorization for the claims.
-        drupal_set_message($this->t('Logging in with @provider has been canceled.', $provider_param), 'warning');
+        $this->messenger()->addWarning($this->t('Logging in with @provider has been canceled.', $provider_param));
       }
       else {
         // Any other error should be logged. E.g. invalid scope.
@@ -169,7 +169,7 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
         ];
         $message = 'Authorization failed: @error. Details: @details';
         $this->loggerFactory->get('openid_connect_' . $client_name)->error($message, $variables);
-        drupal_set_message($this->t('Could not authenticate with @provider.', $provider_param), 'error');
+        $this->messenger()->addError($this->t('Could not authenticate with @provider.', $provider_param));
       }
     }
     else {
@@ -197,7 +197,7 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
                 break;
 
               default:
-                drupal_set_message($this->t('Logging in with @provider could not be completed due to an error.', $provider_param), 'error');
+                $this->messenger()->addError($this->t('Logging in with @provider could not be completed due to an error.', $provider_param));
                 break;
             }
           }
@@ -205,10 +205,10 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
         elseif ($parameters['op'] === 'connect' && $parameters['connect_uid'] === $this->currentUser->id()) {
           $success = $this->openIDConnect->connectCurrentUser($client, $tokens);
           if ($success) {
-            drupal_set_message($this->t('Account successfully connected with @provider.', $provider_param));
+            $this->messenger()->addStatus($this->t('Account successfully connected with @provider.', $provider_param));
           }
           else {
-            drupal_set_message($this->t('Connecting with @provider could not be completed due to an error.', $provider_param), 'error');
+            $this->messenger()->addError($this->t('Connecting with @provider could not be completed due to an error.', $provider_param));
           }
         }
       }
