@@ -188,15 +188,26 @@ class OpenIDConnect {
    * @param array $userinfo
    *   The user claims as returned from
    *   OpenIDConnectClientInterface::retrieveUserInfo().
+   * @param bool $bypass_validation
+   *   Whether to bypass the requirement for both the ID Token ($user_data)
+   *   and UserInfo to contain the sub. See
+   *   OpenIDConnectClientInterface::byPassSubValidation() for details and
+   *   security implications.
    *
    * @return string|false
    *   The sub, or FALSE if there was an error.
+   *
+   * @see \Drupal\openid_connect\Plugin\OpenIdConnectClientInterface::byPassSubValidation()
    */
-  public function extractSub(array $user_data, array $userinfo) {
+  public function extractSub(array $user_data, array $userinfo, bool $bypass_validation = FALSE) {
     if (!isset($user_data['sub']) && !isset($userinfo['sub'])) {
       return FALSE;
     }
     elseif (!isset($user_data['sub'])) {
+      // Unless validation is explicitly disabled, both should contain the sub.
+      if (!$bypass_validation) {
+        return FALSE;
+      }
       return $userinfo['sub'];
     }
     elseif (isset($userinfo['sub']) && $user_data['sub'] != $userinfo['sub']) {
@@ -241,7 +252,7 @@ class OpenIDConnect {
       return FALSE;
     }
 
-    $sub = $this->extractSub($user_data, $userinfo);
+    $sub = $this->extractSub($user_data, $userinfo, $client->byPassSubValidation());
     if (empty($sub)) {
       $message = 'No "sub" found from @provider';
       $variables = ['@provider' => $client->getPluginId()];
@@ -436,7 +447,7 @@ class OpenIDConnect {
       return FALSE;
     }
 
-    $sub = $this->extractSub($user_data, $userinfo);
+    $sub = $this->extractSub($user_data, $userinfo, $client->byPassSubValidation());
     if (empty($sub)) {
       $message = 'No "sub" found from @provider';
       $variables = $provider_param;
