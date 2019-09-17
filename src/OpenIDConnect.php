@@ -17,6 +17,7 @@ use Drupal\user\UserInterface;
 use Drupal\Component\Utility\EmailValidatorInterface;
 use Drupal\Component\Render\MarkupInterface;
 use Drupal\openid_connect\Plugin\OpenIDConnectClientManager;
+use Drupal\openid_connect\Plugin\OpenIDConnectStatefulClientInterface;
 
 /**
  * Main service of the OpenID Connect module.
@@ -696,6 +697,34 @@ class OpenIDConnect {
     $connected_accounts = $this->authmap->getConnectedAccounts($account);
 
     return empty($connected_accounts);
+  }
+
+  /**
+   * Ensure a client is stateful by wrapping it in one if it is not one already.
+   *
+   * @param \Drupal\openid_connect\Plugin\OpenIDConnectClientInterface $client
+   *   A client plugin.
+   * @param array $tokens
+   *   Tokens as returned from
+   *   OpenIDConnectClientInterface::retrieveTokens().
+   *
+   * @return \Drupal\openid_connect\Plugin\OpenIDConnectStatefulClientInterface
+   *   The client plugin, if it was an instance of
+   *   OpenIDConnectStatefulClientInterface, or an
+   *   OpenIDConnectStatelessClientWrapper if it was not.
+   */
+  protected function getStatefulClient(OpenIDConnectClientInterface $client, array $tokens) : OpenIDConnectStatefulClientInterface {
+    if ($client instanceof OpenIDConnectStatefulClientInterface) {
+      return $client;
+    }
+    $configuration = $this->configFactory->get('openid_connect.settings.stateless_client_wrapper')->get();
+    /** @var \Drupal\openid_connect\Plugin\OpenIDConnectStatelessClientWrapper $wrapper_client */
+    $wrapper_client = $this->pluginManager->createInstance(
+      'stateless_client_wrapper',
+      $configuration
+    );
+    $wrapper_client->initializeWithTokens($client, $tokens);
+    return $wrapper_client;
   }
 
   /**
