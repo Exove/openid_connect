@@ -2,6 +2,7 @@
 
 namespace Drupal\openid_connect\Plugin\OpenIDConnectClient;
 
+use Drupal\openid_connect\Plugin\OpenIDConnectClientInterface;
 use Drupal\openid_connect\Plugin\OpenIDConnectStatefulClientBase;
 
 /**
@@ -36,7 +37,7 @@ class OpenIDConnectStatelessClientWrapper extends OpenIDConnectStatefulClientBas
    * The assumption here is that emulating a stateful client will start before
    * the tokens have been fetched.
    *
-   * @param OpenIDConnectClientInterface $client
+   * @param \Drupal\openid_connect\Plugin\OpenIDConnectClientInterface $client
    *   The stateless client to wrap around.
    *
    * @see OpenIdConnectStatelessClientWrapper::initializeWithTokens()
@@ -51,7 +52,7 @@ class OpenIDConnectStatelessClientWrapper extends OpenIDConnectStatefulClientBas
    * The assumption here is that emulating a stateful client will start after
    * the tokens have been fetched.
    *
-   * @param OpenIDConnectClientInterface $client
+   * @param \Drupal\openid_connect\Plugin\OpenIDConnectClientInterface $client
    *   The stateless client to wrap around.
    * @param array $tokens
    *   The tokens as retrieved by OpenIDConnectClientInterface::retrieveTokens()
