@@ -1,7 +1,7 @@
 services:
   openid_connect.openid_connect:
     class: Drupal\openid_connect\OpenIDConnect
-    arguments: ['@config.factory', '@openid_connect.authmap', '@entity_type.manager', '@entity_field.manager', '@current_user', '@user.data', '@email.validator', '@messenger', '@module_handler', '@logger.factory']
+    arguments: ['@config.factory', '@openid_connect.authmap', '@entity_type.manager', '@entity_field.manager', '@current_user', '@user.data', '@email.validator', '@messenger', '@module_handler', '@logger.factory', '@plugin.manager.openid_connect_client.processor']
 
   plugin.manager.openid_connect_client.processor:
     class: Drupal\openid_connect\Plugin\OpenIDConnectClientManager

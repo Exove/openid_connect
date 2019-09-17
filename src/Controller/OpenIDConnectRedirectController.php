@@ -176,39 +176,21 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
       // Process the login or connect operations.
       $tokens = $client->retrieveTokens($query->get('code'));
       if ($tokens) {
+        $success = NULL;
         if ($parameters['op'] === 'login') {
           $success = $this->openIDConnect->completeAuthorization($client, $tokens, $destination);
-
-          if (!$success) {
-            // Check Drupal user register settings before saving.
-            $register = $this->config('user.settings')->get('register');
-            // Respect possible override from OpenID-Connect settings.
-            $register_override = $this->config('openid_connect.settings')
-              ->get('override_registration_settings');
-            if ($register === USER_REGISTER_ADMINISTRATORS_ONLY && $register_override) {
-              $register = USER_REGISTER_VISITORS;
-            }
-
-            switch ($register) {
-              case USER_REGISTER_ADMINISTRATORS_ONLY:
-              case USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL:
-                // Skip creating an error message, as completeAuthorization
-                // already added according messages.
-                break;
-
-              default:
-                $this->messenger()->addError($this->t('Logging in with @provider could not be completed due to an error.', $provider_param));
-                break;
-            }
-          }
         }
         elseif ($parameters['op'] === 'connect' && $parameters['connect_uid'] === $this->currentUser->id()) {
           $success = $this->openIDConnect->connectCurrentUser($client, $tokens);
           if ($success) {
             $this->messenger()->addStatus($this->t('Account successfully connected with @provider.', $provider_param));
           }
-          else {
-            $this->messenger()->addError($this->t('Connecting with @provider could not be completed due to an error.', $provider_param));
+        }
+        // Show errors if an authorization was attempted and it failed.
+        if (FALSE === $success) {
+          $errors = $this->openIDConnect->getAuthorizationErrorMessages();
+          foreach ($errors as $message) {
+            $this->messenger()->addError($message);
           }
         }
       }
