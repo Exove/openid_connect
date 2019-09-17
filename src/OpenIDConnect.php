@@ -676,6 +676,130 @@ class OpenIDConnect {
   }
 
   /**
+   * Get a user account from an authorization.
+   *
+   * Used for tasks common to completeAuthorization and connectCurrentUser.
+   *
+   * @param \Drupal\openid_connect\Plugin\OpenIDConnectStatefulClientInterface $client
+   *   The client.
+   *
+   * @return \Drupal\user\UserInterface|null
+   *   A user account or NULL. NULL will be returned if there was a problem
+   *   with the authorization, the authorization was denied via
+   *   hook_openid_connect_pre_authorize, or if no existing user was found.
+   *   The user account may be one found by a sub match or one provided
+   *   by hook_openid_connect_pre_authorize.
+   */
+  protected function validateAuthorization(OpenIDConnectStatefulClientInterface $client) : ?UserInterface {
+    $this->setAuthorizationState(self::ATTEMPTING_AUTHORIZATION);
+    $common_error_context = [
+      '@provider' => $client->getPluginId(),
+    ];
+    if (!$client->validateIdToken()) {
+      $this->logger->error('Client @provider failed to get a valid ID Token.', $common_error_context);
+      $this->setAuthorizationState(self::ERROR_AUTHORIZATION_FAILED);
+      return NULL;
+    }
+    // Id token is valid, so we can get claims from it.
+    $user_data = $client->getDecodedIdToken();
+    if (!$client->fetchUserInfo()) {
+      $this->logger->error('Client @provider failed to retrieve a valid Userinfo response.', $common_error_context);
+      $this->setAuthorizationState(self::ERROR_AUTHORIZATION_FAILED);
+      return NULL;
+    }
+    // Clients should validate sub while fetching user info, but double check.
+    try {
+      if (!$client->validateSub()) {
+        $this->logger->error('Client @provider failed to retrieve a valid Userinfo response.', $common_error_context);
+        $this->setAuthorizationState(self::ERROR_AUTHORIZATION_FAILED);
+        return NULL;
+      }
+    }
+    catch (Exception $e) {
+      $error_context = $common_error_context + ['@error_details' => $e->getMessage()];
+      $this->logger->error('Client @provider failed to perform sub validation as part of fetching userinfo. Details: @error_details', $error_context);
+      $this->setAuthorizationState(self::ERROR_AUTHORIZATION_FAILED);
+      return NULL;
+    }
+
+    // Now we should have valid userinfo, but first allow the client a chance
+    // to take into account its own possible user mappings.
+    /* @var \Drupal\user\UserInterface|null $account */
+    $account = $client->findUser($this->authmap);
+    $userinfo = $client->getUserInfo();
+
+    // Handle hook_openid_connect_userinfo.
+    $hook_userinfo_context = [
+      'tokens' => $client->getTokens(),
+      'plugin_id' => $client->getPluginId(),
+      'user_data' => $user_data,
+    ];
+    $this->moduleHandler->alter('openid_connect_userinfo', $userinfo, $hook_userinfo_context);
+    // Any changes must be passed back to the client, but allow the client to
+    // have final say in the matter.
+    $client->updateUserInfo($userinfo);
+    /* @var \Drupal\user\UserInterface|null $account */
+    $account = $client->findUser($this->authmap);
+    $userinfo = $client->getUserInfo();
+
+    // By now we can expect an email address.
+    if ($userinfo && empty($userinfo['email'])) {
+      $message = 'No e-mail address provided by @provider';
+      $this->logger->error('No e-mail address provided by @provider', $common_error_context);
+      $this->setAuthorizationState(self::ERROR_AUTHORIZATION_FAILED);
+      return NULL;
+    }
+
+    // No need to validate sub again for trusting the response, but it should
+    // still not be empty.
+    $sub = $client->getSub();
+    if (empty($sub)) {
+      $this->logger->error('No "sub" found from @provider', $common_error_context);
+      $this->setAuthorizationState(self::ERROR_AUTHORIZATION_FAILED);
+      return NULL;
+    }
+
+    // Use the account provided by the client if it provided one.
+    if (empty($account)) {
+      /* @var \Drupal\user\UserInterface|null $account */
+      $account = $this->authmap->userLoadBySub($sub, $client->getPluginId());
+    }
+    $hook_pre_authorize_context = [
+      'tokens' => $client->getTokens(),
+      'plugin_id' => $client->getPluginId(),
+      'user_data' => $user_data,
+      'userinfo' => $userinfo,
+      'sub' => $sub,
+    ];
+    $results = $this->moduleHandler->invokeAll('openid_connect_pre_authorize', [
+      $account,
+      $hook_pre_authorize_context,
+    ]);
+
+    // Deny access if any module returns FALSE.
+    if (in_array(FALSE, $results, TRUE)) {
+      $message = 'Login denied for @email via pre-authorize hook.';
+      $variables = ['@email' => $userinfo['email']];
+      $this->logger->error($message, $variables);
+      $this->setAuthorizationState(self::ERROR_AUTHORIZATION_DENIED);
+      return NULL;
+    }
+
+    // If any module returns an account, set local $account to that.
+    foreach ($results as $result) {
+      if ($result instanceof UserInterface) {
+        $account = $result;
+        break;
+      }
+    }
+
+    if ($account instanceof UserInterface) {
+      return $account;
+    }
+    return NULL;
+  }
+
+  /**
    * Find whether a user is allowed to change the own password.
    *
    * @param \Drupal\Core\Session\AccountInterface $account
