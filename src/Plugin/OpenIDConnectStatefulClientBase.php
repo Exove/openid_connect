@@ -122,6 +122,47 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   protected $userInfo;
 
   /**
+   * Fetch JSON data from URL, return as array.
+   *
+   * @param string $url
+   *   The URL to fetch from.
+   * @param bool|null $use_post
+   *   Whether to use POST(TRUE) or GET(FALSE, Default).
+   * @param array|null $request_options
+   *   Optional request options. Default is to request 'application/json'.
+   *
+   * @return array|null
+   *   Array of fetched data or NULL on failure.
+   */
+  protected function fetchArray(string $url, ?bool $use_post = FALSE, ?array $request_options = NULL) : ?array {
+    if (empty($request_options)) {
+      $request_options = [
+        'headers' => [
+          'Accept' => 'application/json',
+        ],
+      ];
+    }
+    /* @var \GuzzleHttp\ClientInterface $client */
+    $client = $this->httpClient;
+    try {
+      if ($use_post) {
+        $response = $client->post($url, $request_options);
+      }
+      else {
+        $response = $client->get($url, $request_options);
+      }
+      $response_data = json_decode((string) $response->getBody(), TRUE);
+      if (!is_array($response_data)) {
+        return NULL;
+      }
+      return $response_data;
+    }
+    catch (Exception $e) {
+      $this->getLogger()->error('Failed to fetch data from @url. Details: @error_message', ['@url' => $url, '@error_message' => $e->getMessage()]);
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function defaultConfiguration() {
