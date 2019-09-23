@@ -7,6 +7,8 @@ use Drupal\openid_connect\OpenIDConnectAuthmap;
 use Drupal\user\UserInterface;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Form\FormStateInterface;
+use Jose\Component\Core\JWK;
+use Jose\Component\Core\JWKSet;
 
 /**
  * Base class for stateful OpenID Connect client plugins.
@@ -84,6 +86,13 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
    * @see \Drupal\openid_connect\OpenIDConnectClaims::getScopes()
    */
   protected $clientScopes = NULL;
+
+  /**
+   * JSON Web Key Set (JWKS) containing the Identity Provider's public keys.
+   *
+   * @var \Jose\Component\Core\JWKSet
+   */
+  protected $providerJwkSet;
 
   /**
    * The authorization code.
@@ -711,6 +720,86 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       $this->logger = $this->loggerFactory->get('openid_connect_' . $this->pluginId);
     }
     return $this->logger;
+  }
+
+  /**
+   * Fetch the JSON Web Key Set containing the Identity Provider's public keys.
+   *
+   * @param bool|null $force_refresh
+   *   If TRUE, fetch keys even if already fetched. Default FALSE.
+   *
+   * @return bool
+   *   TRUE on success, FALSE on failure.
+   */
+  protected function fetchJwks(?bool $force_refresh = FALSE) : bool {
+    if (!empty($this->providerJwkSet) && !$force_refresh) {
+      return TRUE;
+    }
+    $jwks_uri = $this->getJwksUrl();
+    if (empty($jwks_uri)) {
+      $this->getLogger()->error('Missing Identity Provider JWKS URL');
+      return FALSE;
+    }
+    $jwks = $this->fetchArray($jwks_uri);
+    try {
+      $jwkset = JWKSet::createFromKeyData($jwks);
+      if (count($jwkset) === 0) {
+        $this->getLogger()->error('Provider JWKS contained no keys');
+        return FALSE;
+      }
+      $this->providerJwkSet = $jwkset;
+      return TRUE;
+    }
+    catch (Exception $e) {
+      $this->getLogger()->error('Failed to get Identity Provider JWKS or it contains no keys.');
+      return FALSE;
+    }
+  }
+
+  /**
+   * Get the Identity Provider's public key for signing.
+   *
+   * If there are multiple keys, try to return the most preferred one
+   * based on configuration. If there are no keys or no available keys
+   * are allowd by current configuration, return NULL.
+   *
+   * @return \Jose\Component\Core\JWK|null
+   *   A JWK object containing preferred signing keys or NULL on failure.
+   *
+   * @todo implement key filtering.
+   */
+  protected function getProviderSigningKey() : ?JWK {
+    if (!$this->fetchJwks()) {
+      return NULL;
+    }
+    $key = $this->providerJwkSet->selectKey('sig');
+    if (empty($key)) {
+      $this->getLogger()->error('Could not find an Identity Provider key for signing.');
+    }
+    return $key;
+  }
+
+  /**
+   * Get the Identity Provider's public key for encryption.
+   *
+   * If there are multiple keys, try to return the most preferred one
+   * based on configuration. If there are no keys or no available keys
+   * are allowd by current configuration, return NULL.
+   *
+   * @return \Jose\Component\Core\JWK|null
+   *   A JWK object containing preferred encryption keys or NULL on failure.
+   *
+   * @todo implement key filtering.
+   */
+  protected function getProviderEncryptionKey() : ?JWK {
+    if (!$this->fetchJwks()) {
+      return NULL;
+    }
+    $key = $this->providerJwkSet->selectKey('enc');
+    if (empty($key)) {
+      $this->getLogger()->error('Could not find an Identity Provider key for encryption.');
+    }
+    return $key;
   }
 
   /**
