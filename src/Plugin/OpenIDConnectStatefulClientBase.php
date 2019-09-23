@@ -32,6 +32,36 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   protected $logger;
 
   /**
+   * Default path component for OpenID Connect Discovery URL.
+   */
+  const OIDC_DISCOVERY_PATH = '/.well-known/openid-configuration';
+
+  /**
+   * Mandatory fields for discovered configuration.
+   *
+   * @var array
+   */
+  protected $requiredFieldsForDiscoveredConfiguration = [
+    'issuer',
+    'authorization_endpoint',
+    'token_endpoint',
+    'userinfo_endpoint',
+    'jwks_uri',
+    'response_types_supported',
+    'id_token_signing_alg_values_supported',
+  ];
+
+  /**
+   * OpenID Connect Discovery provided Identity Provider configuration.
+   *
+   * If discovery is used, the first configuration response is cached here for
+   * the lifetime of the client.
+   *
+   * @var array
+   */
+  protected $discoveredConfiguration = [];
+
+  /**
    * The minimum set of scopes for this client.
    *
    * @var array|null
@@ -160,6 +190,59 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     catch (Exception $e) {
       $this->getLogger()->error('Failed to fetch data from @url. Details: @error_message', ['@url' => $url, '@error_message' => $e->getMessage()]);
     }
+  }
+
+  /**
+   * Get OpenID Connect Discovery URL.
+   *
+   * Requires that either the Issuer Identifier is set or the Discovery URL is
+   * set. The latter overrides the former if both are set.
+   *
+   * @return string|null
+   *   The OpenID Connect Discovery URL or NULL if not set or invalid or if
+   *   settings are inconsistent.
+   */
+  protected function getDiscoveryUrl() : ?string {
+    $discovery_uri = $this->configuration['discovery_uri'];
+    if (empty($discovery_uri)) {
+      $discovery_uri = $this->configuration['issuer_identifier'] . self::OIDC_DISCOVERY_PATH;
+    }
+    if (!UrlHelper::isValid($discovery_uri, TRUE)) {
+      return NULL;
+    }
+    return $discovery_uri;
+  }
+
+  /**
+   * Discover configuration from the Identity Provider.
+   *
+   * @param bool|null $force_refresh
+   *   If TRUE, fetch configuration again even if already fetched.
+   *
+   * @return bool
+   *   Whether a configuration has been successfully fetched.
+   */
+  protected function discoverConfiguration(?bool $force_refresh = FALSE) : bool {
+    if (!empty($this->discoverConfiguration) && !$force_refresh) {
+      return TRUE;
+    }
+    $discovery_uri = $this->getDiscoveryUrl();
+    if (empty($discovery_uri)) {
+      $this->getLogger()->error('No valid URL for OIDC Connect Discovery!');
+      return FALSE;
+    }
+    $config = $this->fetchArray($discovery_uri);
+    if (empty($config)) {
+      return FALSE;
+    }
+    foreach ($this->requiredFieldsForDiscoveredConfiguration as $field) {
+      if (empty($config[$field])) {
+        $this->getLogger()->error('The OpenID Connect Discovery provided configuration is missing the mandatory field @field', ['@field' => $field]);
+        return FALSE;
+      }
+    }
+    $this->discoveredConfiguration = $config;
+    return TRUE;
   }
 
   /**
