@@ -62,6 +62,21 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   protected $discoveredConfiguration = [];
 
   /**
+   * An array of endpoints.
+   *
+   * Should contain the following endpoints:
+   *   - discovery (may be empty)
+   *   - authorization
+   *   - token
+   *   - userinfo
+   *   - jwks.
+   * If only discovery is configured, it will be used to determine the rest.
+   *
+   * @var array
+   */
+  protected $endpoints = [];
+
+  /**
    * The minimum set of scopes for this client.
    *
    * @var array|null
@@ -243,6 +258,49 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     }
     $this->discoveredConfiguration = $config;
     return TRUE;
+  }
+
+  /**
+   * Returns an array of endpoints.
+   *
+   * @return array
+   *   An array with the following keys:
+   *   - discovery: The OpenID Connect Discovery URL or empty if not set.
+   *   - authorization: The full url to the authorization endpoint.
+   *   - token: The full url to the token endpoint.
+   *   - userinfo: The full url to the userinfo endpoint.
+   *   - jwks: The full url to the JWKS used for signing responses.
+   */
+  public function getEndpoints() : array {
+    if (!isset($this->endpoints['discovery'])) {
+      $discovery_uri = $this->getDiscoveryUrl();
+      if (empty($discovery_uri)) {
+        $this->endpoints['discovery'] = '';
+      }
+      else {
+        $this->endpoints['discovery'] = $discovery_uri;
+      }
+    }
+    // Configuration key => endpoint array key.
+    $required_endpoints = [
+      'authorization_endpoint' => 'authorization',
+      'token_endpoint' => 'token',
+      'jwks_uri' => 'jwks',
+    ];
+    if ($this->configuration['use_userinfo_endpoint']) {
+      $required_endpoints['userinfo_endpoint'] = 'userinfo';
+    }
+    if ($this->configuration['use_discovery'] && $this->discoverConfiguration()) {
+      foreach ($required_endpoints as $config_key => $endpoint_key) {
+        $this->endpoints[$endpoint_key] = $this->discoveredConfiguration[$config_key];
+      }
+    }
+    // @todo Consider if this is the right way and document it.
+    // If endpoints are set explicitly, override possible discovered values.
+    foreach ($required_endpoints as $config_key => $endpoint_key) {
+      $this->endpoints[$endpoint_key] = $this->configuration[$config_key];
+    }
+    return $this->endpoints;
   }
 
   /**

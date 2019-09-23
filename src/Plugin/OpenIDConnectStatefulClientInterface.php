@@ -16,6 +16,19 @@ use Drupal\user\UserInterface;
 interface OpenIDConnectStatefulClientInterface extends OpenIDConnectClientInterface {
 
   /**
+   * Returns an array of endpoints.
+   *
+   * @return array
+   *   An array with the following keys:
+   *   - discovery: The OpenID Connect Discovery URL or empty if not set.
+   *   - authorization: The full url to the authorization endpoint.
+   *   - token: The full url to the token endpoint.
+   *   - userinfo: The full url to the userinfo endpoint.
+   *   - jwks: The full url to the JWKS used for signing responses.
+   */
+  public function getEndpoints() : array;
+
+  /**
    * Get the unaltered tokens as fetched by retrieveTokens().
    *
    * @return array
