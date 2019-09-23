@@ -222,7 +222,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
         'client_id' => $this->configuration['client_id'],
         'response_type' => 'code',
         'scope' => $scope,
-        'redirect_uri' => $redirect_uri->getGeneratedUrl(),
+        'redirect_uri' => $redirect_uri->toString(),
         'state' => OpenIDConnectStateToken::create(),
       ],
     ];
@@ -250,7 +250,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
         'absolute' => TRUE,
         'language' => $language_none,
       ]
-    )->toString(TRUE);
+    );
 
     $url_options = $this->getUrlOptions($scope, $redirect_uri);
 
