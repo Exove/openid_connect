@@ -208,16 +208,9 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   }
 
   /**
-   * Get OpenID Connect Discovery URL.
-   *
-   * Requires that either the Issuer Identifier is set or the Discovery URL is
-   * set. The latter overrides the former if both are set.
-   *
-   * @return string|null
-   *   The OpenID Connect Discovery URL or NULL if not set or invalid or if
-   *   settings are inconsistent.
+   * {@inheritdoc}
    */
-  protected function getDiscoveryUrl() : ?string {
+  public function getDiscoveryUrl() : ?string {
     $discovery_uri = $this->configuration['discovery_uri'];
     if (empty($discovery_uri)) {
       $discovery_uri = $this->configuration['issuer_identifier'] . self::OIDC_DISCOVERY_PATH;
@@ -226,6 +219,54 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       return NULL;
     }
     return $discovery_uri;
+  }
+
+  /**
+   * Get a valid endpoint URL or NULL on failure.
+   *
+   * @param string $endpoint_key
+   *   The key of the endpoint, see getEndpoints().
+   *
+   * @return string|null
+   *   The URL for the endpoint or NULL if it is not a valid URL.
+   */
+  protected function getValidEndpointUrl(string $endpoint_key) : ?string {
+    if (empty($this->endpoints[$endpoint_key])) {
+      $this->getEndpoints();
+    }
+    $url = $this->endpoints[$endpoint_key];
+    if (!UrlHelper::isValid($url, TRUE)) {
+      return NULL;
+    }
+    return $url;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getAuthorizationEndpoint() : ?string {
+    return $this->getValidEndpointUrl('authorization');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getTokenEndpoint() : ?string {
+    return $this->getValidEndpointUrl('token');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getUserInfoEndpoint() : ?string {
+    return $this->getValidEndpointUrl('userinfo');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getJwksUrl() : ?string {
+    return $this->getValidEndpointUrl('jwks');
   }
 
   /**

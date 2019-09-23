@@ -29,6 +29,50 @@ interface OpenIDConnectStatefulClientInterface extends OpenIDConnectClientInterf
   public function getEndpoints() : array;
 
   /**
+   * Get OpenID Connect Discovery URL.
+   *
+   * Requires that either the Issuer Identifier is set or the Discovery URL is
+   * set. The latter overrides the former if both are set.
+   *
+   * @return string|null
+   *   The OpenID Connect Discovery URL or NULL if not set or invalid or if
+   *   settings are inconsistent.
+   */
+  public function getDiscoveryUrl() : ?string;
+
+  /**
+   * Get the Authorization endpoint.
+   *
+   * @return string|null
+   *   A full, valid URL to the Authorization endpoint or NULL on failure.
+   */
+  public function getAuthorizationEndpoint() : ?string;
+
+  /**
+   * Get the Token endpoint.
+   *
+   * @return string|null
+   *   A full, valid URL to the Token endpoint or NULL on failure.
+   */
+  public function getTokenEndpoint() : ?string;
+
+  /**
+   * Get the Userinfo endpoint.
+   *
+   * @return string|null
+   *   A full, valid URL to the Userinfo endpoint or NULL on failure.
+   */
+  public function getUserInfoEndpoint() : ?string;
+
+  /**
+   * Get the JWKS URL.
+   *
+   * @return string|null
+   *   A full, valid URL to the JWKS or NULL on failure.
+   */
+  public function getJwksUrl() : ?string;
+
+  /**
    * Get the unaltered tokens as fetched by retrieveTokens().
    *
    * @return array
