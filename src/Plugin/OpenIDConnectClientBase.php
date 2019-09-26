@@ -239,6 +239,18 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    * {@inheritdoc}
    */
   public function getClientScopes(): ?array {
+    // An extending client may have set the scopes e.g. in the constructor.
+    // If not, provide the scopes from configuration if set there.
+    if (empty($this->clientScopes) || !is_array($this->clientScopes)) {
+      $this->clientScopes = NULL;
+      $scope_string = $this->configuration['scope'] ?? '';
+      if (!empty($scope_string)) {
+        $scopes = explode(' ', trim($scope_string));
+        if (!empty($scopes)) {
+          $this->clientScopes = $scopes;
+        }
+      }
+    }
     return $this->clientScopes;
   }
 
