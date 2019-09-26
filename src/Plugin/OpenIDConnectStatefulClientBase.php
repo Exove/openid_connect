@@ -394,6 +394,7 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       'userinfo_endpoint' => '',
       'jwks_uri' => '',
       'scope' => '',
+      'acr_values' => '',
       'use_request_object' => TRUE,
       'encrypt_authorization_request' => TRUE,
       'request_object_encryption_alg_values_supported_whitelist' => '',
@@ -499,6 +500,12 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       '#description' => $this->t('This controls what kind of access to the user information is requested from the Identity Provider. This should be usually left empty to use the default value of "openid email".'),
       '#type' => 'textfield',
       '#default_value' => $this->configuration['scope'],
+    ];
+    $form['acr_values'] = [
+      '#title' => $this->t('Authentication Context Class Reference values'),
+      '#description' => $this->t('Space separated ACR values in order of decreasing preference. Some Identity Providers may allow these to affect how the user should identify themselves to the Identity Provider.'),
+      '#type' => 'textfield',
+      '#default_value' => $this->configuration['acr_values'],
     ];
     // @todo Validate when discovery is enabled.
     $form['use_request_object'] = [
