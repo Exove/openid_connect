@@ -25,6 +25,7 @@
     "web-token/jwt-signature-algorithm-eddsa": "^2",
     "web-token/jwt-signature-algorithm-hmac": "^2",
     "web-token/jwt-signature-algorithm-none": "^2",
-    "web-token/jwt-signature-algorithm-rsa": "^2"
+    "web-token/jwt-signature-algorithm-rsa": "^2",
+    "web-token/jwt-checker": "^2"
   }
 }
