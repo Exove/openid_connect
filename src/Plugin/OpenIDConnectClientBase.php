@@ -348,12 +348,15 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
       'form_params' => [
         'code' => $authorization_code,
         'client_id' => $this->configuration['client_id'],
-        'client_secret' => $this->configuration['client_secret'],
         'redirect_uri' => $redirect_uri,
         'grant_type' => 'authorization_code',
       ],
       'headers' => [
         'Accept' => 'application/json',
+      ],
+      'auth' => [
+        $this->configuration['client_id'],
+        $this->configuration['client_secret'],
       ],
     ];
 
