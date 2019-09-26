@@ -189,6 +189,32 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
    *   Array of fetched data or NULL on failure.
    */
   protected function fetchArray(string $url, ?bool $use_post = FALSE, ?array $request_options = NULL) : ?array {
+    $response_body = $this->fetch($url, $use_post, $request_options);
+    if (is_null($response_body)) {
+      // Fetch should have already logged the problem, so just return.
+      return NULL;
+    }
+    $response_data = json_decode($response_body, TRUE);
+    if (!is_array($response_data)) {
+      return NULL;
+    }
+    return $response_data;
+  }
+
+  /**
+   * Fetch data from URL, return response body as string.
+   *
+   * @param string $url
+   *   The URL to fetch from.
+   * @param bool|null $use_post
+   *   Whether to use POST(TRUE) or GET(FALSE, Default).
+   * @param array|null $request_options
+   *   Optional request options. Default is to request 'application/json'.
+   *
+   * @return string|null
+   *   String of fetched data or NULL on failure.
+   */
+  protected function fetch(string $url, ?bool $use_post = FALSE, ?array $request_options = NULL) : ?string {
     if (empty($request_options)) {
       $request_options = [
         'headers' => [
@@ -205,14 +231,12 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       else {
         $response = $client->get($url, $request_options);
       }
-      $response_data = json_decode((string) $response->getBody(), TRUE);
-      if (!is_array($response_data)) {
-        return NULL;
-      }
-      return $response_data;
+      $response_body = (string) $response->getBody();
+      return $response_body;
     }
     catch (Exception $e) {
       $this->getLogger()->error('Failed to fetch data from @url. Details: @error_message', ['@url' => $url, '@error_message' => $e->getMessage()]);
+      return NULL;
     }
   }
 
@@ -367,6 +391,7 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       'token_endpoint' => '',
       'userinfo_endpoint' => '',
       'jwks_uri' => '',
+      'scope' => '',
       'use_request_object' => TRUE,
       'encrypt_authorization_request' => TRUE,
       'request_object_encryption_alg_values_supported_whitelist' => '',
@@ -475,6 +500,12 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       '#description' => $this->t('The URL from which to fetch the public encryption and signing keys used by the Identity Provider.'),
       '#type' => 'textfield',
       '#default_value' => $this->configuration['jwks_uri'],
+    ];
+    $form['scope'] = [
+      '#title' => $this->t('Authorization Request Scope'),
+      '#description' => $this->t('This controls what kind of access to the user information is requested from the Identity Provider. This should be usually left empty to use the default value of "openid email".'),
+      '#type' => 'textfield',
+      '#default_value' => $this->configuration['scope'],
     ];
     // @todo Validate when discovery is enabled.
     $form['use_request_object'] = [
