@@ -303,15 +303,20 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   }
 
   /**
-   * Discover configuration from the Identity Provider.
+   * Discover configuration from the Identity Provider if appropriate.
    *
    * @param bool|null $force_refresh
    *   If TRUE, fetch configuration again even if already fetched.
    *
    * @return bool
-   *   Whether a configuration has been successfully fetched.
+   *   TRUE if configuration discovery was successfull, or if it is disabled.
+   *   FALSE if discovery is enabled but it failed.
    */
   protected function discoverConfiguration(?bool $force_refresh = FALSE) : bool {
+    if (empty($this->configuration['use_discovery'])) {
+      // If discovery is disabled, we're okay.
+      return TRUE;
+    }
     if (!empty($this->discoverConfiguration) && !$force_refresh) {
       return TRUE;
     }
