@@ -426,20 +426,11 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
    * {@inheritdoc}
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
-    $redirect_url = URL::fromRoute(
-      'openid_connect.redirect_controller_redirect',
-      [
-        'client_name' => $this->pluginId,
-      ],
-      [
-        'absolute' => TRUE,
-      ]
-    );
     $form['redirect_url'] = [
       '#title' => $this->t('Redirect URL'),
       '#description' => $this->t('Identity Provider will redirect the user to this URL after the authorization.'),
       '#type' => 'item',
-      '#markup' => $redirect_url->toString(),
+      '#markup' => $this->getRedirectUrl(TRUE)->toString(),
     ];
     $form['client_id'] = [
       '#title' => $this->t('Client ID'),
@@ -526,7 +517,7 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     $form['require_id_token_encryption'] = [
       '#title' => $this->t('Do not accept unencrypted ID Tokens'),
       '#description' => $this->t('OpenID Connect does not mandate ID Token encryption, but some Identity Providers may do so.'),
-      '#type' => 'textfield',
+      '#type' => 'checkbox',
       '#default_value' => $this->configuration['require_id_token_encryption'],
     ];
     $form['use_userinfo_endpoint'] = [
