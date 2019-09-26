@@ -372,7 +372,9 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     // @todo Consider if this is the right way and document it.
     // If endpoints are set explicitly, override possible discovered values.
     foreach ($required_endpoints as $config_key => $endpoint_key) {
-      $this->endpoints[$endpoint_key] = $this->configuration[$config_key];
+      if (!empty($this->configuration[$config_key])) {
+        $this->endpoints[$endpoint_key] = $this->configuration[$config_key];
+      }
     }
     return $this->endpoints;
   }
