@@ -166,19 +166,10 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    * {@inheritdoc}
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
-    $redirect_url = URL::fromRoute(
-      'openid_connect.redirect_controller_redirect',
-      [
-        'client_name' => $this->pluginId,
-      ],
-      [
-        'absolute' => TRUE,
-      ]
-    );
     $form['redirect_url'] = [
       '#title' => $this->t('Redirect URL'),
       '#type' => 'item',
-      '#markup' => $redirect_url->toString(),
+      '#markup' => $this->getRedirectUrl(TRUE)->toString(),
     ];
     $form['client_id'] = [
       '#title' => $this->t('Client ID'),
@@ -233,6 +224,29 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
     // @codingStandardsIgnoreStart
     return [];
     // @codingStandardsIgnoreEnd
+  }
+
+  /**
+   * Get the redirect url.
+   *
+   * @param bool|null $localized
+   *   Whether to include the language code or not. Default FALSE.
+   *
+   * @return \Drupal\Core\Url
+   *   The redirect url.
+   */
+  protected function getRedirectUrl(?bool $localized = FALSE) : Url {
+    $options = [
+      'absolute' => TRUE,
+    ];
+    if ($localized) {
+      $options['language'] = \Drupal::languageManager()->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
+    }
+    $redirect_uri = Url::fromRoute(
+      'openid_connect.redirect_controller_redirect',
+      ['client_name' => $this->pluginId],
+      $options);
+    return $redirect_uri;
   }
 
   /**
@@ -297,18 +311,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    *   fixed in PHP 7.4.
    */
   public function authorize(?string $scope = 'openid email') : Response {
-    $language_none = \Drupal::languageManager()
-      ->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
-    $redirect_uri = Url::fromRoute(
-      'openid_connect.redirect_controller_redirect',
-      [
-        'client_name' => $this->pluginId,
-      ],
-      [
-        'absolute' => TRUE,
-        'language' => $language_none,
-      ]
-    );
+    $redirect_uri = $this->getRedirectUrl();
 
     $url_options = $this->getUrlOptions($scope, $redirect_uri);
 
@@ -338,19 +341,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    *   A result array or NULL on failure.
    */
   public function retrieveTokens(string $authorization_code) : ?array {
-    // Exchange `code` for access token and ID token.
-    $language_none = \Drupal::languageManager()
-      ->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
-    $redirect_uri = Url::fromRoute(
-      'openid_connect.redirect_controller_redirect',
-      [
-        'client_name' => $this->pluginId,
-      ],
-      [
-        'absolute' => TRUE,
-        'language' => $language_none,
-      ]
-    )->toString();
+    $redirect_uri = $this->getRedirectUrl()->toString();
     $endpoints = $this->getEndpoints();
 
     $request_options = [
