@@ -22,3 +22,8 @@ services:
   openid_connect.session:
     class: Drupal\openid_connect\OpenIDConnectSession
     arguments: ['@path.current', '@request_stack']
+  
+  openid_connect.jwt_helper:
+    class: Drupal\openid_connect\OpenIDConnectJwtHelper
+    arguments:
+      - '@logger.factory'
