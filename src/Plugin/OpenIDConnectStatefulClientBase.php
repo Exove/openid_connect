@@ -1456,7 +1456,33 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     if (!empty($this->userInfo) && $this->validateSub()) {
       return TRUE;
     }
-    $userinfo = parent::retrieveUserInfo($this->accessToken);
+    // If UserInfo endpoint should not be used, pick up UserInfo from
+    // the ID Token.
+    if (empty($this->configuration['use_userinfo_endpoint'])) {
+      $userinfo = $this->idToken;
+    }
+    else {
+      // @todo handle case where userinfo is not JWE+JWS
+      $request_options = [
+        'headers' => [
+          'Authorization' => 'Bearer ' . $this->accessToken,
+          'Accept' => 'application/json',
+        ],
+      ];
+      $userinfo_response = $this->fetch(
+        $this->getUserInfoEndpoint(),
+        TRUE,
+        $request_options
+      );
+      // If unencrypted, unsigned responses are allowed, try that first.
+      $userinfo = NULL;
+      if (empty($this->configuration['require_userinfo_encryption']) && empty($this->configuration['require_userinfo_signature'])) {
+        $userinfo = json_decode($userinfo_response, TRUE);
+      }
+      if (empty($userinfo) || !is_array($userinfo)) {
+        $userinfo = $this->processUserInfoJwt($userinfo_response);
+      }
+    }
     if (empty($userinfo) || !is_array($userinfo)) {
       return FALSE;
     }
@@ -1470,6 +1496,97 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       return FALSE;
     }
     return TRUE;
+  }
+
+  /**
+   * Decrypt and verify a JWT UserInfo response.
+   *
+   * @param string $userinfo_response
+   *   The body of the userinfo response.
+   *
+   * @return array|null
+   *   An array of UserInfo claims or NULL on failure, or if the UserInfo
+   *   response encryption or signature is not acceptable with
+   *   current configuration.
+   */
+  protected function processUserInfoJwt(string $userinfo_response) : ?array {
+    $jwt_helper = $this->getJwtHelper();
+    $token = $userinfo_response;
+    $token_parts = explode('.', $token);
+    $encrypted_token = count($token_parts) === 5 ? $token : NULL;
+    $signed_token = count($token_parts) === 3 ? $token : NULL;
+    $payload = NULL;
+    if (!empty($encrypted_token)) {
+      // Handle encrypted token.
+      $client_key = $this->getClientEncryptionKey();
+      if (empty($client_key)) {
+        $this->getLogger()->error('Could not get a client key for decrypting UserInfo Response.');
+        return NULL;
+      }
+      $key_encryption_algorithms = $this->selectAlgorithms('userinfo_key_encryption', $client_key);
+      $content_encryption_algorithms = $this->selectAlgorithms('userinfo_content_encryption', $client_key);
+      $jwe_payload = $jwt_helper->decryptJwe(
+        $encrypted_token,
+        $client_key,
+        $key_encryption_algorithms,
+        $content_encryption_algorithms
+      );
+      if (empty($jwe_payload)) {
+        $this->getLogger()->error('Failed to decrypt UserInfo.');
+        return NULL;
+      }
+      // Is the token also signed?
+      $payload = json_decode($jwe_payload, TRUE);
+      if (!is_array($payload)) {
+        $payload = NULL;
+        $jwe_payload_parts = explode('.', $jwe_payload);
+        if (count($jwe_payload_parts) === 3) {
+          // Looks like the payload is a JWS.
+          $signed_token = $jwe_payload;
+        }
+        else {
+          $this->getLogger()->error('Encrypted UserInfo response was neither a JSON object or a JWS.');
+          return NULL;
+        }
+      }
+      else {
+        // The response was only encrypted, return the claims.
+        return $payload;
+      }
+    }
+    elseif (empty($encrypted_token) && !empty($this->configuration['require_userinfo_encryption'])) {
+      $this->getLogger()->error('UserInfo is required to be encrypted, but it is not.');
+      return NULL;
+    }
+
+    if (!empty($signed_token)) {
+      $provider_key = $this->getProviderSigningKey();
+      if (empty($provider_key)) {
+        $this->getLogger()->error('Can not verify UserInfo signature without Identity Provider Signature key');
+        return NULL;
+      }
+      $signature_algorithms = $this->selectAlgorithms('userinfo_signing', $provider_key);
+      $jws_payload = $jwt_helper->loadAndVerifyJws(
+        $signed_token,
+        $provider_key,
+        $signature_algorithms
+      );
+      $payload = json_decode($jws_payload, TRUE);
+      if (!is_array($payload)) {
+        $payload = NULL;
+        $this->getLogger()->error('Encrypted UserInfo payload was not a JSON object.');
+        return NULL;
+      }
+    }
+    elseif (!empty($this->configuration['require_userinfo_signature'])) {
+      $this->getLogger()->error('UserInfo is required to be signed, but it was not.');
+      return NULL;
+    }
+    if (!is_array($payload) || empty($payload)) {
+      $this->getLogger()->error('Unknown error in UserInfo validation');
+      return NULL;
+    }
+    return $payload;
   }
 
   /**
