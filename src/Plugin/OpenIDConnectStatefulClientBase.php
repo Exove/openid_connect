@@ -63,6 +63,72 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   protected $discoveredConfiguration = [];
 
   /**
+   * Possible uses for algorithm selection.
+   *
+   * These correspond to available values in OpenID Connect Discovery provided
+   * configuration advertising available or accepted signature (signing_alg),
+   * key encryption (encryption_alg) and content encryption (encryption_enc)
+   * algorithms.
+   *
+   * @var array
+   *
+   * @see OpenIDConnectStatefulClientBase::selectAlgorithms()
+   */
+  protected $algorithmSelectionUses = [
+    'request_object_key_encryption' => [
+      'discovered_configuration_key' => 'request_object_encryption_alg_values_supported',
+      'configuration_whitelist_key' => 'request_object_encryption_alg_values_whitelist',
+      'configuration_blacklist_key' => 'request_object_encryption_alg_values_blacklist',
+      'use_key_hint' => TRUE,
+    ],
+    'request_object_content_encryption' => [
+      'discovered_configuration_key' => 'request_object_encryption_enc_values_supported',
+      'configuration_whitelist_key' => 'request_object_encryption_enc_values_whitelist',
+      'configuration_blacklist_key' => 'request_object_encryption_enc_values_blacklist',
+    ],
+    'request_object_signing' => [
+      'discovered_configuration_key' => 'request_object_signing_alg_values_supported',
+      'configuration_whitelist_key' => 'request_object_signing_alg_values_whitelist',
+      'configuration_blacklist_key' => 'request_object_signing_alg_values_blacklist',
+      'use_key_hint' => TRUE,
+    ],
+    'id_token_key_encryption' => [
+      'discovered_configuration_key' => 'id_token_encryption_alg_values_supported',
+      'configuration_whitelist_key' => 'id_token_encryption_alg_values_whitelist',
+      'configuration_blacklist_key' => 'id_token_encryption_alg_values_blacklist',
+      'use_key_hint' => TRUE,
+    ],
+    'id_token_content_encryption' => [
+      'discovered_configuration_key' => 'id_token_encryption_enc_values_supported',
+      'configuration_whitelist_key' => 'id_token_encryption_enc_values_whitelist',
+      'configuration_blacklist_key' => 'id_token_encryption_enc_values_blacklist',
+    ],
+    'id_token_signing' => [
+      'discovered_configuration_key' => 'id_token_signing_alg_values_supported',
+      'configuration_whitelist_key' => 'id_token_signing_alg_values_whitelist',
+      'configuration_blacklist_key' => 'id_token_signing_alg_values_blacklist',
+      'use_key_hint' => TRUE,
+    ],
+    'userinfo_key_encryption' => [
+      'discovered_configuration_key' => 'userinfo_encryption_alg_values_supported',
+      'configuration_whitelist_key' => 'userinfo_encryption_alg_values_whitelist',
+      'configuration_blacklist_key' => 'userinfo_encryption_alg_values_blacklist',
+      'use_key_hint' => TRUE,
+    ],
+    'userinfo_content_encryption' => [
+      'discovered_configuration_key' => 'userinfo_encryption_enc_values_supported',
+      'configuration_whitelist_key' => 'userinfo_encryption_enc_values_whitelist',
+      'configuration_blacklist_key' => 'userinfo_encryption_enc_values_blacklist',
+    ],
+    'userinfo_signing' => [
+      'discovered_configuration_key' => 'userinfo_signing_alg_values_supported',
+      'configuration_whitelist_key' => 'userinfo_signing_alg_values_whitelist',
+      'configuration_blacklist_key' => 'userinfo_signing_alg_values_blacklist',
+      'use_key_hint' => TRUE,
+    ],
+  ];
+
+  /**
    * An array of endpoints.
    *
    * Should contain the following endpoints:
@@ -302,6 +368,27 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   }
 
   /**
+   * Get an array from a configuration field of comma separated values.
+   *
+   * @param string $key
+   *   Configuration key.
+   *
+   * @return array|null
+   *   The resulting array, or NULL if the key is not set, the value is
+   *   empty(), or if the value results in an empty array.
+   */
+  public function getArrayFromCsvConfiguration(string $key) : ?array {
+    if (empty($this->configuration[$key])) {
+      return NULL;
+    }
+    $as_array = explode(',', $this->configuration);
+    if (empty($as_array)) {
+      return NULL;
+    }
+    return $as_array;
+  }
+
+  /**
    * Discover configuration from the Identity Provider if appropriate.
    *
    * @param bool|null $force_refresh
@@ -401,26 +488,26 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       'acr_values' => '',
       'use_request_object' => TRUE,
       'encrypt_authorization_request' => TRUE,
-      'request_object_encryption_alg_values_supported_whitelist' => '',
-      'request_object_encryption_alg_values_supported_blacklist' => '',
-      'request_object_encryption_enc_values_supported_whitelist' => '',
-      'request_object_encryption_enc_values_supported_blacklist' => '',
+      'request_object_encryption_alg_values_whitelist' => '',
+      'request_object_encryption_alg_values_blacklist' => '',
+      'request_object_encryption_enc_values_whitelist' => '',
+      'request_object_encryption_enc_values_blacklist' => '',
       'require_id_token_encryption' => TRUE,
-      'id_token_encryption_alg_values_supported_whitelist' => '',
-      'id_token_encryption_alg_values_supported_blacklist' => '',
-      'id_token_encryption_enc_values_supported_whitelist' => '',
-      'id_token_encryption_enc_values_supported_blacklist' => '',
-      'id_token_signing_alg_values_supported_whitelist' => '',
-      'id_token_signing_alg_values_supported_blacklist' => '',
+      'id_token_encryption_alg_values_whitelist' => '',
+      'id_token_encryption_alg_values_blacklist' => '',
+      'id_token_encryption_enc_values_whitelist' => '',
+      'id_token_encryption_enc_values_blacklist' => '',
+      'id_token_signing_alg_values_whitelist' => '',
+      'id_token_signing_alg_values_blacklist' => '',
       'use_userinfo_endpoint' => TRUE,
       'require_userinfo_encryption' => TRUE,
-      'userinfo_encryption_alg_values_supported_whitelist' => '',
-      'userinfo_encryption_alg_values_supported_blacklist' => '',
-      'userinfo_encryption_enc_values_supported_whitelist' => '',
-      'userinfo_encryption_enc_values_supported_blacklist' => '',
+      'userinfo_encryption_alg_values_whitelist' => '',
+      'userinfo_encryption_alg_values_blacklist' => '',
+      'userinfo_encryption_enc_values_whitelist' => '',
+      'userinfo_encryption_enc_values_blacklist' => '',
       'require_userinfo_signature' => TRUE,
-      'userinfo_signing_alg_values_supported_whitelist' => '',
-      'userinfo_signing_alg_values_supported_blacklist' => '',
+      'userinfo_signing_alg_values_whitelist' => '',
+      'userinfo_signing_alg_values_blacklist' => '',
       'client_key_id' => '',
       'client_key' => '',
       'show_advanced_cryptography_settings' => FALSE,
@@ -571,104 +658,104 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     ];
     // Request related crypto settings.
     // @todo hide when request object is not used.
-    $form['request_object_encryption_alg_values_supported_whitelist'] = [
+    $form['request_object_encryption_alg_values_whitelist'] = [
       '#title' => $this->t('Allowed request object encryption algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['request_object_encryption_alg_values_supported_whitelist'],
+      '#default_value' => $this->configuration['request_object_encryption_alg_values_whitelist'],
     ];
-    $form['request_object_encryption_alg_values_supported_blacklist'] = [
+    $form['request_object_encryption_alg_values_blacklist'] = [
       '#title' => $this->t('Forbidden request object encryption algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['request_object_encryption_alg_values_supported_blacklist'],
+      '#default_value' => $this->configuration['request_object_encryption_alg_values_blacklist'],
     ];
-    $form['request_object_encryption_enc_values_supported_whitelist'] = [
+    $form['request_object_encryption_enc_values_whitelist'] = [
       '#title' => $this->t('Allowed request object encryption algorithms for content encryption ("enc")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['request_object_encryption_enc_values_supported_whitelist'],
+      '#default_value' => $this->configuration['request_object_encryption_enc_values_whitelist'],
     ];
-    $form['request_object_encryption_enc_values_supported_blacklist'] = [
+    $form['request_object_encryption_enc_values_blacklist'] = [
       '#title' => $this->t('Forbidden request object encryption algorithms for content encryption ("alg")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['request_object_encryption_enc_values_supported_blacklist'],
+      '#default_value' => $this->configuration['request_object_encryption_enc_values_blacklist'],
     ];
     // ID Token related crypto settings.
-    $form['id_token_encryption_alg_values_supported_whitelist'] = [
+    $form['id_token_encryption_alg_values_whitelist'] = [
       '#title' => $this->t('Allowed ID Token encryption algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['id_token_encryption_alg_values_supported_whitelist'],
+      '#default_value' => $this->configuration['id_token_encryption_alg_values_whitelist'],
     ];
-    $form['id_token_encryption_alg_values_supported_blacklist'] = [
+    $form['id_token_encryption_alg_values_blacklist'] = [
       '#title' => $this->t('Forbidden ID Token encryption algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['id_token_encryption_alg_values_supported_blacklist'],
+      '#default_value' => $this->configuration['id_token_encryption_alg_values_blacklist'],
     ];
-    $form['id_token_encryption_enc_values_supported_whitelist'] = [
+    $form['id_token_encryption_enc_values_whitelist'] = [
       '#title' => $this->t('Allowed ID Token encryption algorithms for content encryption ("enc")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['id_token_encryption_enc_values_supported_whitelist'],
+      '#default_value' => $this->configuration['id_token_encryption_enc_values_whitelist'],
     ];
-    $form['id_token_encryption_enc_values_supported_blacklist'] = [
+    $form['id_token_encryption_enc_values_blacklist'] = [
       '#title' => $this->t('Forbidden ID Token encryption algorithms for content encryption ("enc")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['id_token_encryption_enc_values_supported_blacklist'],
+      '#default_value' => $this->configuration['id_token_encryption_enc_values_blacklist'],
     ];
-    $form['id_token_signing_alg_values_supported_whitelist'] = [
+    $form['id_token_signing_alg_values_whitelist'] = [
       '#title' => $this->t('Allowed ID Token signature algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['id_token_signing_alg_values_supported_whitelist'],
+      '#default_value' => $this->configuration['id_token_signing_alg_values_whitelist'],
     ];
-    $form['id_token_signing_alg_values_supported_blacklist'] = [
+    $form['id_token_signing_alg_values_blacklist'] = [
       '#title' => $this->t('Forbidden ID Token signature algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['id_token_signing_alg_values_supported_blacklist'],
+      '#default_value' => $this->configuration['id_token_signing_alg_values_blacklist'],
     ];
     // Userinfo related crypto settings.
     // @todo hide when Userinfo endpoint is not used.
-    $form['userinfo_encryption_alg_values_supported_whitelist'] = [
+    $form['userinfo_encryption_alg_values_whitelist'] = [
       '#title' => $this->t('Allowed UserInfo encryption algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['userinfo_encryption_alg_values_supported_whitelist'],
+      '#default_value' => $this->configuration['userinfo_encryption_alg_values_whitelist'],
     ];
-    $form['userinfo_encryption_alg_values_supported_blacklist'] = [
+    $form['userinfo_encryption_alg_values_blacklist'] = [
       '#title' => $this->t('Forbidden UserInfo encryption algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['userinfo_encryption_alg_values_supported_blacklist'],
+      '#default_value' => $this->configuration['userinfo_encryption_alg_values_blacklist'],
     ];
-    $form['userinfo_encryption_enc_values_supported_whitelist'] = [
+    $form['userinfo_encryption_enc_values_whitelist'] = [
       '#title' => $this->t('Allowed UserInfo encryption algorithms for content encryption ("enc")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['userinfo_encryption_enc_values_supported_whitelist'],
+      '#default_value' => $this->configuration['userinfo_encryption_enc_values_whitelist'],
     ];
-    $form['userinfo_encryption_enc_values_supported_blacklist'] = [
+    $form['userinfo_encryption_enc_values_blacklist'] = [
       '#title' => $this->t('Forbidden UserInfo encryption algorithms for content encryption ("enc")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['userinfo_encryption_enc_values_supported_blacklist'],
+      '#default_value' => $this->configuration['userinfo_encryption_enc_values_blacklist'],
     ];
-    $form['userinfo_signing_alg_values_supported_whitelist'] = [
+    $form['userinfo_signing_alg_values_whitelist'] = [
       '#title' => $this->t('Allowed UserInfo signature algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of algorithms in decreasing order of preference.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['userinfo_signing_alg_values_supported_whitelist'],
+      '#default_value' => $this->configuration['userinfo_signing_alg_values_whitelist'],
     ];
-    $form['userinfo_signing_alg_values_supported_blacklist'] = [
+    $form['userinfo_signing_alg_values_blacklist'] = [
       '#title' => $this->t('Forbidden UserInfo signature algorithms for key management ("alg")'),
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
-      '#default_value' => $this->configuration['userinfo_signing_alg_values_supported_blacklist'],
+      '#default_value' => $this->configuration['userinfo_signing_alg_values_blacklist'],
     ];
 
     return $form;
@@ -835,6 +922,90 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       $this->getLogger()->error('Could not find an Identity Provider key for encryption.');
     }
     return $key;
+  }
+
+  /**
+   * Select an algorithm by use case depending on configuration.
+   *
+   * - If a whitelist has been configured, it will be used to select the
+   * preferred algorithms from the ones available per discovered configuration.
+   * - If there is no discovered configuration the whitelist will be used
+   * instead of that.
+   * - If a key with an 'alg' parameter on it is provided, that will be the
+   * first result for key encryption and signing uses, unless it is missing
+   * from a nonempty whitelist or included on a nonempty blacklist.
+   * - If a blacklist has been configured, algorithms on it are removed, even if
+   * a key suggesting such an algorithm is provided.
+   *
+   * Note that the order of the results is undefined without a whitelist,
+   * other than the guarantee that a non-blacklisted algorithm from a key
+   * will be the first for key encryption and signing uses.
+   *
+   * @param string $use
+   *   See OpenIDConnectStatefulClientBase::algorithmSelectionUses.
+   *   Possible values:
+   *    - request_object_key_encryption
+   *    - request_object_content_encryption
+   *    - request_object_signing
+   *    - id_token_key_encryption
+   *    - id_token_content_encryption
+   *    - id_token_signing
+   *    - userinfo_key_encryption
+   *    - userinfo_content_encryption
+   *    - userinfo_signing.
+   * @param \Jose\Component\Core\JWK|null $key
+   *   An optional key to inform the selection.
+   *
+   * @return array
+   *   An array of algorithms names. If a whitelist was configured, the
+   *   names are in whitelist order, unless a key was provided as well,
+   *   in which case the key alg has the highest precedence. The list may
+   *   be empty.
+   */
+  protected function selectAlgorithms(string $use, ?JWK $key = NULL) : array {
+    $configuration_keys = $this->algorithmSelectionUses[$use] ?? NULL;
+    if (empty($configuration_keys)) {
+      $this->getLogger()->error('Tried to select an algorithm for an unrecognized use @use', ['@use' => $use]);
+      return [];
+    }
+    $discovered_configuration_key = $configuration_keys['discovered_configuration_key'] ?? NULL;
+    $configuration_whitelist_key = $configuration_keys['configuration_whitelist_key'] ?? NULL;
+    $configuration_blacklist_key = $configuration_keys['configuration_blacklist_key'] ?? NULL;
+    $use_key_hint = $this->algorithmSelectionUses[$use]['use_key_hint'] ?? FALSE;
+    if (empty($discovered_configuration_key) || empty($configuration_whitelist_key || empty($configuration_blacklist_key))) {
+      $this->getLogger()->error('Tried to select an algorithm for a use @use that is not properly supported', ['@use' => $use]);
+      return [];
+    }
+    $provider_algorithms = [];
+    if ($this->discoverConfiguration() && !empty($this->discoveredConfiguration[$discovered_configuration_key] && is_array($this->discoveredConfiguration[$discovered_configuration_key]))) {
+      $provider_algorithms = $this->discoveredConfiguration[$discovered_configuration_key];
+    }
+    $client_whitelist = $this->getArrayFromCsvConfiguration($configuration_whitelist_key) ?? [];
+    $client_blacklist = $this->getArrayFromCsvConfiguration($configuration_blacklist_key) ?? [];
+    $selected_algorithms = $provider_algorithms;
+    // If a whitelist is provided, use that instead of the provider list.
+    if (!empty($client_whitelist)) {
+      $selected_algorithms = $client_whitelist;
+      // If the provider list is not empty, include only those present.
+      if (!empty($provider_algorithms)) {
+        $selected_algorithms = array_intersect($client_whitelist, $provider_algorithms);
+      }
+    }
+    // If algorithm from key should be used and one is provided, include it
+    // as the first one, unless it is missing from a nonempty whitelist.
+    if ($use_key_hint && !empty($key) && $key->has('alg')) {
+      $key_algorithm = $key->get('alg');
+      if (!empty($key_algorithm)) {
+        if (empty($client_whitelist) || in_array($key_algorithm, $client_whitelist)) {
+          $selected_algorithms = array_unique([$key_algorithm] + $selected_algorithms);
+        }
+      }
+    }
+    // Remove blacklisted algorithms.
+    if (!empty($client_blacklist)) {
+      $selected_algorithms = array_diff($selected_algorithms, $client_blacklist);
+    }
+    return $selected_algorithms;
   }
 
   /**
