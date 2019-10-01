@@ -534,6 +534,13 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       'client_key_id' => '',
       'client_key' => '',
       'show_advanced_cryptography_settings' => FALSE,
+      'use_sub_normalization' => FALSE,
+      'sub_normalization_fields_id_token' => '',
+      'sub_normalization_fields_userinfo' => '',
+      'sub_normalization_salt' => '',
+      'sub_normalization_uppercase_input' => FALSE,
+      'generate_fake_emails' => FALSE,
+      'generated_email_domain' => 'openid-connect-generated-fake-email.invalid',
     ];
   }
 
@@ -779,6 +786,51 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       '#description' => $this->t('A comma separated list of forbidden algorithms.'),
       '#type' => 'textfield',
       '#default_value' => $this->configuration['userinfo_signing_alg_values_blacklist'],
+    ];
+    $form['use_sub_normalization'] = [
+      '#title' => $this->t('Enable sub normalization'),
+      '#description' => $this->t('Use fields other than "sub" to identify users on subsequent logins by hashing one or more other fields.'),
+      '#type' => 'checkbox',
+      '#default_value' => $this->configuration['use_sub_normalization'],
+    ];
+    // @todo hide if normalization is disabled.
+    $form['sub_normalization_fields_id_token'] = [
+      '#title' => $this->t('ID Token fields used for sub normalization'),
+      '#description' => $this->t('A comma separated list of ID Token fields to use for sub normalization.'),
+      '#type' => 'textfield',
+      '#default_value' => $this->configuration['sub_normalization_fields_id_token'],
+    ];
+    // @todo hide if normalization is disabled.
+    $form['sub_normalization_fields_userinfo'] = [
+      '#title' => $this->t('Userinfo fields used for sub normalization'),
+      '#description' => $this->t('A comma separated list of Userinfo fields to use for sub normalization.'),
+      '#type' => 'textfield',
+      '#default_value' => $this->configuration['sub_normalization_fields_userinfo'],
+    ];
+    // @todo hide if normalization is disabled.
+    $form['sub_normalization_salt'] = [
+      '#title' => $this->t('Salt for sub normalization'),
+      '#description' => $this->t('This should be a long random string. The "normalized sub" is produced by a salted hash of the concatenation of the selected id token and userinfo fields.'),
+      '#type' => 'textfield',
+      '#default_value' => $this->configuration['sub_normalization_salt'],
+    ];
+    $form['sub_normalization_uppercase_input'] = [
+      '#title' => $this->t('Uppercase fields used for sub normalization'),
+      '#description' => $this->t('If enabled, the values from fields used for sub normalization will be converted into uppercase. Useful if the case of the fields does not matter and if Identity Providers might supply these with inconsistent case.'),
+      '#type' => 'checkbox',
+      '#default_value' => $this->configuration['sub_normalization_uppercase_input'],
+    ];
+    $form['generate_fake_emails'] = [
+      '#title' => $this->t('Generate fake emails'),
+      '#description' => $this->t('If the Identity Provider does not provide an email address, generate a fake email address when creating new users.'),
+      '#type' => 'checkbox',
+      '#default_value' => $this->configuration['generate_fake_emails'],
+    ];
+    $form['generated_email_domain'] = [
+      '#title' => $this->t('Domain name for generated fake email addresses.'),
+      '#description' => $this->t('This module does not prevent attempts at sending emails to the generated addresses. Generally, domain names ending in ".invalid" should be safe, but to be sure, other steps should be taken to be sure of emails not being sent.'),
+      '#type' => 'textfield',
+      '#default_value' => $this->configuration['generated_email_domain'],
     ];
 
     return $form;
@@ -1495,6 +1547,11 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       $this->userInfo = NULL;
       return FALSE;
     }
+    // Fake email generation is based on sub, so it must be done after
+    // possible sub normalization.
+    if (empty($userinfo['email']) && !empty($this->configuration['generate_fake_emails'])) {
+      $this->userInfo['email'] = $this->generateFakeEmail();
+    }
     return TRUE;
   }
 
@@ -1612,6 +1669,8 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   final public function validateSub() : bool {
     // If sub was already validated once, that is sufficient for response
     // validation purposes.
+    // Also after the first validation the ID Token and UserInfo
+    // may hold normalized subs instead of the original.
     if (!empty($this->originalSub) && !empty($this->sub)) {
       return TRUE;
     }
@@ -1647,6 +1706,9 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
         return FALSE;
       }
       $this->sub = $normalized_sub;
+      // Also apply to ID Token and UserInfo.
+      $this->idToken['sub'] = $normalized_sub;
+      $this->userInfo['sub'] = $normalized_sub;
       return TRUE;
     }
     catch (Exception $e) {
@@ -1703,15 +1765,121 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     if (empty($this->sub)) {
       throw new \Exception('Attempted to get an invalid sub!');
     }
-    return $this->sub;
+    if (empty($this->configuration['use_sub_normalization'])) {
+      return $this->sub;
+    }
+    $salt = $this->configuration['sub_normalization_salt'];
+    if (empty($salt)) {
+      $message = 'Can not use sub normalization without salt.';
+      $this->getLogger()->error($message);
+      throw new \Exception($message);
+    }
+    $userinfo_field_string = $this->configuration['sub_normalization_fields_userinfo'];
+    $id_token_field_string = $this->configuration['sub_normalization_fields_id_token'];
+    $id_token_fields = explode(',', $id_token_field_string);
+    $userinfo_fields = explode(',', $userinfo_field_string);
+    $hash_input = '';
+    foreach ($id_token_fields as $field) {
+      if (!isset($this->idToken[$field])) {
+        $this->getLogger()->error("ID Token field @field can not be used for sub normalization because it is missing.", ['@field' => $field]);
+        continue;
+      }
+      $hash_input .= $this->idToken[$field];
+    }
+    foreach ($userinfo_fields as $field) {
+      if (!isset($this->userInfo[$field])) {
+        $this->getLogger()->error("Userinfo field @field can not be used for sub normalization because it is missing.", ['@field' => $field]);
+        continue;
+      }
+      $hash_input .= $this->userInfo[$field];
+    }
+    if (empty($hash_input)) {
+      $message = 'All fields for sub normalization were missing or empty.';
+      $this->getLogger()->error($message);
+      throw new \Exception($message);
+    }
+    $hashed = $this->getSubNormalizationHash($hash_input);
+    return $hashed;
   }
 
   /**
-   * This default implementation yields user mapping to the caller.
+   * Get a salted hash of the input corresponding to a normalized sub.
+   *
+   * For a known client plugin sub normalization configuration, this method
+   * allows to compute what the normalized sub would be for a user with certain
+   * values for certain Userinfo and/or ID Token claims.
+   *
+   * This could be useful for e.g. associating existing or newly created
+   * users outside of OpenID Connect flows.
+   *
+   * @param string $input
+   *   The hash input. See sub normalization configuration.
+   *
+   * @return string
+   *   A sha512 hash of the sub normalization salt concatenated with the input.
+   */
+  public function getSubNormalizationHash(string $input) : string {
+    $salt = $this->configuration['sub_normalization_salt'];
+    if (empty($salt)) {
+      $message = 'Can not use sub normalization without salt.';
+      $this->getLogger()->error($message);
+      throw new \Exception($message);
+    }
+    if (!empty($this->configuration['sub_normalization_uppercase_input'])) {
+      $input = mb_strtoupper($input);
+    }
+    $hashed = hash('sha512', $salt . $input);
+    return $hashed;
+  }
+
+  /**
+   * Generate a fake email address based on sub.
+   *
+   * @param string|null $input
+   *   Optional. Defaults to normalized sub. If not empty, will be used as
+   *   the input for sub normalization.
+   *
+   * @return string
+   *   The generated email address, consisting of a normalized sub as the
+   *   address part and having the configured domain.
+   */
+  public function generateFakeEmail(?string $input = NULL) : string {
+    $domain_part = $this->configuration['generated_email_domain'] ?? NULL;
+    if (empty($domain_part)) {
+      throw new \Exception('No domain configured for generated emails.');
+    }
+    if (empty($input)) {
+      $address_part = $this->getSub();
+    }
+    else {
+      $address_part = $this->getSubNormalizationHash($input);
+    }
+    return $address_part . '@' . $domain_part;
+  }
+
+  /**
+   * Find a user by sub.
+   *
+   * If a user is found, and they have an email address, inject that email
+   * address into UserInfo, if the UserInfo does not contain an address, or
+   * the address there is a fake generated by this client.
    *
    * @inheritDoc
    */
   public function findUser(?OpenIDConnectAuthmap $authmap = NULL): ?UserInterface {
+
+    // Try to find a user. If one is found, return it, but first, if a fake
+    // email was generated for Userinfo, replace it with a real one.
+    $account = $authmap->userLoadBySub($this->getSub(), $this->pluginId);
+    if (!empty($account) && !empty($account->getEmail())) {
+      if (empty($this->userinfo['email']) ||
+        (!empty($this->configuration['generate_fake_emails']) &&
+        $this->userInfo['email'] == $this->generateFakeEmail())) {
+        // Only inject the email if the existing one was a generated one.
+        $this->userInfo['email'] = $account->getEmail();
+      }
+      return $account;
+    }
     return NULL;
   }
 
