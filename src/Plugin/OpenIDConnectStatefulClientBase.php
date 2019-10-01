@@ -1305,21 +1305,92 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   /**
    * {@inheritdoc}
    *
-   * @todo Add signature validation.
+   * @todo Support unencrypted tokens.
+   * @todo Take algorithm selection configuration properly into account.
+   * @todo Allow rejecting tokens that are only encrypted?
    */
   public function validateIdToken(): bool {
     if (empty($this->originalIdToken)) {
       return FALSE;
     }
     // ID Token may already have been decoded successfully.
-    if (!empty($this->idToken)) {
+    if (!empty($this->idToken) && is_array($this->idToken)) {
       return TRUE;
     }
-    $claims = $this->decodeJwtClaims($this->originalIdToken);
-    if (empty($claims)) {
+    $token = $this->originalIdToken;
+    $jwt_helper = $this->getJwtHelper();
+    $token_parts = explode('.', $token);
+    $encrypted_token = count($token_parts) === 5 ? $token : NULL;
+    $signed_token = count($token_parts) === 3 ? $token : NULL;
+    $payload = NULL;
+    if (!empty($encrypted_token)) {
+      // Handle encrypted token.
+      $client_key = $this->getClientEncryptionKey();
+      if (empty($client_key)) {
+        $this->getLogger()->error('Could not get a client key for decrypting ID Token.');
+        return FALSE;
+      }
+      $key_encryption_algorithms = $this->selectAlgorithms('id_token_key_encryption', $client_key);
+      $content_encryption_algorithms = $this->selectAlgorithms('id_token_content_encryption', $client_key);
+      $jwe_payload = $jwt_helper->decryptJwe(
+        $encrypted_token,
+        $client_key,
+        $key_encryption_algorithms,
+        $content_encryption_algorithms
+      );
+      if (empty($jwe_payload)) {
+        $this->getLogger()->error('Failed to decrypt ID Token.');
+        return FALSE;
+      }
+      // Is the token also signed?
+      $payload = json_decode($jwe_payload, TRUE);
+      if (!is_array($payload)) {
+        $payload = NULL;
+        $jwe_payload_parts = explode('.', $jwe_payload);
+        if (count($jwe_payload_parts) === 3) {
+          // Looks like the payload is a JWS.
+          $signed_token = $jwe_payload;
+        }
+        else {
+          $this->getLogger()->error('Encrypted ID Token payload was neither a JSON object or a JWS.');
+          return FALSE;
+        }
+      }
+      else {
+        // The token was only encrypted, get the claims.
+        $this->idToken = $payload;
+        return TRUE;
+      }
+    }
+    elseif (empty($encrypted_token) && !empty($this->configuration['require_id_token_encryption'])) {
+      $this->getLogger()->error('ID Token is required to be encrypted, but it is not.');
       return FALSE;
     }
-    $this->idToken = $claims;
+
+    if (!empty($signed_token)) {
+      $provider_key = $this->getProviderSigningKey();
+      if (empty($provider_key)) {
+        $this->getLogger()->error('Can not verify ID Token signature without Identity Provider Signature key');
+        return FALSE;
+      }
+      $signature_algorithms = $this->selectAlgorithms('id_token_signing', $provider_key);
+      $jws_payload = $jwt_helper->loadAndVerifyJws(
+        $signed_token,
+        $provider_key,
+        $signature_algorithms
+      );
+      $payload = json_decode($jws_payload, TRUE);
+      if (!is_array($payload)) {
+        $payload = NULL;
+        $this->getLogger()->error('Encrypted ID Token payload was not a JSON object.');
+        return FALSE;
+      }
+    }
+    if (!is_array($payload) || empty($payload)) {
+      $this->getLogger()->error('Unknown error in ID Token validation');
+      return FALSE;
+    }
+    $this->idToken = $payload;
     return TRUE;
   }
 
