@@ -50,7 +50,6 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
     'userinfo_endpoint',
     'jwks_uri',
     'response_types_supported',
-    'id_token_signing_alg_values_supported',
   ];
 
   /**
