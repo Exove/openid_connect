@@ -7,6 +7,7 @@ use Drupal\openid_connect\OpenIDConnectAuthmap;
 use Drupal\user\UserInterface;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\openid_connect\OpenIDConnectJwtHelper;
 use Jose\Component\Core\JWK;
 use Jose\Component\Core\JWKSet;
 
@@ -32,6 +33,13 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
    * @var \Drupal\Core\Logger\LoggerChannelInterface
    */
   protected $logger;
+
+  /**
+   * The OpenID Connect JWT helper service.
+   *
+   * @var \Drupal\openid_connect\OpenIDConnectJwtHelper
+   */
+  protected $jwtHelper;
 
   /**
    * Default path component for OpenID Connect Discovery URL.
@@ -239,6 +247,19 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
    * @see hook_openid_connect_userinfo_alter()
    */
   protected $userInfo;
+
+  /**
+   * Get the OpenID Connect JWT helper service.
+   *
+   * @return \Drupal\openid_connect\OpenIDConnectJwtHelper
+   *   The OpenID Connect JWT helper service.
+   */
+  protected function getJwtHelper() : OpenIDConnectJwtHelper {
+    if (empty($this->jwtHelper)) {
+      $this->jwtHelper = \Drupal::service('openid_connect.jwt_helper');
+    }
+    return $this->jwtHelper;
+  }
 
   /**
    * Fetch JSON data from URL, return as array.
