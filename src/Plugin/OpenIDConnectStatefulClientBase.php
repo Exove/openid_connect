@@ -7,7 +7,9 @@ use Drupal\openid_connect\OpenIDConnectAuthmap;
 use Drupal\user\UserInterface;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 use Drupal\openid_connect\OpenIDConnectJwtHelper;
+use Drupal\openid_connect\OpenIDConnectStateToken;
 use Jose\Component\Core\JWK;
 use Jose\Component\Core\JWKSet;
 
@@ -946,6 +948,28 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
   }
 
   /**
+   * Get client encryption key as a JWK.
+   *
+   * @return \Jose\Component\Core\JWK|null
+   *   The client encryption key or NULL on failure.
+   */
+  protected function getClientEncryptionKey() : ?JWK {
+    $client_key_json = $this->configuration['client_key'];
+    if (empty($client_key_json)) {
+      $this->getLogger()->error('Client key is missing or empty');
+      return NULL;
+    }
+    try {
+      $client_jwk = JWK::createFromJson($client_key_json);
+      return $client_jwk;
+    }
+    catch (\Exception $e) {
+      $this->getLogger()->error('Client key loading failed. Details: @error_message', ['@error_message' => $e->getMessage()]);
+      return NULL;
+    }
+  }
+
+  /**
    * Select an algorithm by use case depending on configuration.
    *
    * - If a whitelist has been configured, it will be used to select the
@@ -1027,6 +1051,100 @@ abstract class OpenIDConnectStatefulClientBase extends OpenIDConnectClientBase i
       $selected_algorithms = array_diff($selected_algorithms, $client_blacklist);
     }
     return $selected_algorithms;
+  }
+
+  /**
+   * Encode the Authorization Request as a Request Object JWT.
+   *
+   * The Authorization Request parameters are rolled into a single JWT
+   * as specified in OIDC specification section 6.1. Depending on client
+   * configuration, the result may be an encrypted one (JWE), a signed one
+   * (JWS) or a nested JWT, i.e. an encrypted token containing a signed token.
+   *
+   * Note that only encryption is supported for now.
+   *
+   * @param array $query
+   *   The Authorization Request parameters.
+   *
+   * @return string
+   *   A JWT containing a Request Object as per OIDC specification section 6.1.
+   *
+   * @throws Exception
+   *   Throws an Exception if an appropriate Request Object can not be built.
+   */
+  protected function getRequestObject(array $query) : string {
+    if (!$this->configuration['encrypt_authorization_request']) {
+      $error = 'Unencrypted request object not supported';
+      $this->getLogger()->error($error);
+      throw new \Exception($error);
+    }
+    $jwk = $this->getProviderEncryptionKey();
+    if (empty($jwk)) {
+      $error = 'Could not get Identity Provider encryption key.';
+      $this->getLogger()->error($error);
+      throw new \Exception($error);
+    }
+    $key_encryption_algorithms = $this->selectAlgorithms('request_object_key_encryption', $jwk);
+    $key_encryption_algorithm = reset($key_encryption_algorithms);
+    if (empty($key_encryption_algorithm)) {
+      throw new \Exception('Could not select request object key encryption algorithm.');
+    }
+    $content_encryption_algorithms = $this->selectAlgorithms('request_object_content_encryption');
+    $content_encryption_algorithm = reset($content_encryption_algorithms);
+    if (empty($content_encryption_algorithm)) {
+      throw new \Exception('Could not select request object content encryption algorithm.');
+    }
+    $jwt_helper = $this->getJwtHelper();
+    $request_jwe_token = $jwt_helper->buildJwe(
+      $query,
+      $jwk,
+      $content_encryption_algorithm,
+      $key_encryption_algorithm
+    );
+    return $request_jwe_token;
+  }
+
+  /**
+   * Get URL options for the Authorization endpoint.
+   *
+   * @param string $scope
+   *   A string of scopes.
+   * @param \Drupal\Core\Url $redirect_uri
+   *   The redirect Url.
+   *
+   * @return array
+   *   An array of options for generating the full Authorization endpoint URL.
+   *
+   * @todo Add a nonce, save it and verify it afterwards.
+   * @todo Add encryption and/or signing of query depending on client settings.
+   */
+  protected function getUrlOptions(string $scope, Url $redirect_uri) : array {
+    $query = [
+      'client_id' => $this->configuration['client_id'],
+      'response_type' => 'code',
+      'scope' => $scope,
+      'redirect_uri' => $redirect_uri->toString(),
+      'state' => OpenIDConnectStateToken::create(),
+    ];
+    // Add acr_values only if specified.
+    $acr_values = $this->configuration['acr_values'] ?? NULL;
+    if (!empty($acr_values)) {
+      $query['acr_values'] = $acr_values;
+    }
+    if ($this->configuration['use_request_object']) {
+      $request = $this->getRequestObject($query);
+      // The client_id and response_type are required outside of the request
+      // as well to be valid OAuth 2.0.
+      $query = [
+        'client_id' => $this->configuration['client_id'],
+        'response_type' => 'code',
+        'request' => $request,
+      ];
+    }
+    $url_options = [
+      'query' => $query,
+    ];
+    return $url_options;
   }
 
   /**
