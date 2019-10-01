@@ -166,19 +166,10 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    * {@inheritdoc}
    */
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
-    $redirect_url = URL::fromRoute(
-      'openid_connect.redirect_controller_redirect',
-      [
-        'client_name' => $this->pluginId,
-      ],
-      [
-        'absolute' => TRUE,
-      ]
-    );
     $form['redirect_url'] = [
       '#title' => $this->t('Redirect URL'),
       '#type' => 'item',
-      '#markup' => $redirect_url->toString(),
+      '#markup' => $this->getRedirectUrl(TRUE)->toString(),
     ];
     $form['client_id'] = [
       '#title' => $this->t('Client ID'),
@@ -236,9 +227,44 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
   }
 
   /**
+   * Get the redirect url.
+   *
+   * @param bool|null $localized
+   *   Whether to include the language code or not. Default FALSE.
+   *
+   * @return \Drupal\Core\Url
+   *   The redirect url.
+   */
+  protected function getRedirectUrl(?bool $localized = FALSE) : Url {
+    $options = [
+      'absolute' => TRUE,
+    ];
+    if ($localized) {
+      $options['language'] = \Drupal::languageManager()->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
+    }
+    $redirect_uri = Url::fromRoute(
+      'openid_connect.redirect_controller_redirect',
+      ['client_name' => $this->pluginId],
+      $options);
+    return $redirect_uri;
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function getClientScopes(): ?array {
+    // An extending client may have set the scopes e.g. in the constructor.
+    // If not, provide the scopes from configuration if set there.
+    if (empty($this->clientScopes) || !is_array($this->clientScopes)) {
+      $this->clientScopes = NULL;
+      $scope_string = $this->configuration['scope'] ?? '';
+      if (!empty($scope_string)) {
+        $scopes = explode(' ', trim($scope_string));
+        if (!empty($scopes)) {
+          $this->clientScopes = $scopes;
+        }
+      }
+    }
     return $this->clientScopes;
   }
 
@@ -262,7 +288,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
         'client_id' => $this->configuration['client_id'],
         'response_type' => 'code',
         'scope' => $scope,
-        'redirect_uri' => $redirect_uri->getGeneratedUrl(),
+        'redirect_uri' => $redirect_uri->toString(),
         'state' => OpenIDConnectStateToken::create(),
       ],
     ];
@@ -285,18 +311,7 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    *   fixed in PHP 7.4.
    */
   public function authorize(?string $scope = 'openid email') : Response {
-    $language_none = \Drupal::languageManager()
-      ->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
-    $redirect_uri = Url::fromRoute(
-      'openid_connect.redirect_controller_redirect',
-      [
-        'client_name' => $this->pluginId,
-      ],
-      [
-        'absolute' => TRUE,
-        'language' => $language_none,
-      ]
-    )->toString(TRUE);
+    $redirect_uri = $this->getRedirectUrl();
 
     $url_options = $this->getUrlOptions($scope, $redirect_uri);
 
@@ -326,31 +341,22 @@ abstract class OpenIDConnectClientBase extends PluginBase implements OpenIDConne
    *   A result array or NULL on failure.
    */
   public function retrieveTokens(string $authorization_code) : ?array {
-    // Exchange `code` for access token and ID token.
-    $language_none = \Drupal::languageManager()
-      ->getLanguage(LanguageInterface::LANGCODE_NOT_APPLICABLE);
-    $redirect_uri = Url::fromRoute(
-      'openid_connect.redirect_controller_redirect',
-      [
-        'client_name' => $this->pluginId,
-      ],
-      [
-        'absolute' => TRUE,
-        'language' => $language_none,
-      ]
-    )->toString();
+    $redirect_uri = $this->getRedirectUrl()->toString();
     $endpoints = $this->getEndpoints();
 
     $request_options = [
       'form_params' => [
         'code' => $authorization_code,
         'client_id' => $this->configuration['client_id'],
-        'client_secret' => $this->configuration['client_secret'],
         'redirect_uri' => $redirect_uri,
         'grant_type' => 'authorization_code',
       ],
       'headers' => [
         'Accept' => 'application/json',
+      ],
+      'auth' => [
+        $this->configuration['client_id'],
+        $this->configuration['client_secret'],
       ],
     ];
 

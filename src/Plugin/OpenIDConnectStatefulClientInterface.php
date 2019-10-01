@@ -16,6 +16,63 @@ use Drupal\user\UserInterface;
 interface OpenIDConnectStatefulClientInterface extends OpenIDConnectClientInterface {
 
   /**
+   * Returns an array of endpoints.
+   *
+   * @return array
+   *   An array with the following keys:
+   *   - discovery: The OpenID Connect Discovery URL or empty if not set.
+   *   - authorization: The full url to the authorization endpoint.
+   *   - token: The full url to the token endpoint.
+   *   - userinfo: The full url to the userinfo endpoint.
+   *   - jwks: The full url to the JWKS used for signing responses.
+   */
+  public function getEndpoints() : array;
+
+  /**
+   * Get OpenID Connect Discovery URL.
+   *
+   * Requires that either the Issuer Identifier is set or the Discovery URL is
+   * set. The latter overrides the former if both are set.
+   *
+   * @return string|null
+   *   The OpenID Connect Discovery URL or NULL if not set or invalid or if
+   *   settings are inconsistent.
+   */
+  public function getDiscoveryUrl() : ?string;
+
+  /**
+   * Get the Authorization endpoint.
+   *
+   * @return string|null
+   *   A full, valid URL to the Authorization endpoint or NULL on failure.
+   */
+  public function getAuthorizationEndpoint() : ?string;
+
+  /**
+   * Get the Token endpoint.
+   *
+   * @return string|null
+   *   A full, valid URL to the Token endpoint or NULL on failure.
+   */
+  public function getTokenEndpoint() : ?string;
+
+  /**
+   * Get the Userinfo endpoint.
+   *
+   * @return string|null
+   *   A full, valid URL to the Userinfo endpoint or NULL on failure.
+   */
+  public function getUserInfoEndpoint() : ?string;
+
+  /**
+   * Get the JWKS URL.
+   *
+   * @return string|null
+   *   A full, valid URL to the JWKS or NULL on failure.
+   */
+  public function getJwksUrl() : ?string;
+
+  /**
    * Get the unaltered tokens as fetched by retrieveTokens().
    *
    * @return array

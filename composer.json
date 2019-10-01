@@ -11,7 +11,21 @@
     "source": "http://cgit.drupalcode.org/openid_connect"
   },
   "require": {
-    "drupal/core": "^8.5"
+    "drupal/core": "^8.5",
+    "web-token/jwt-nested-token" : "^2",
+    "web-token/jwt-encryption-algorithm-aescbc": "^2",
+    "web-token/jwt-encryption-algorithm-aesgcm": "^2",
+    "web-token/jwt-encryption-algorithm-aesgcmkw": "^2",
+    "web-token/jwt-encryption-algorithm-aeskw": "^2",
+    "web-token/jwt-encryption-algorithm-dir": "^2",
+    "web-token/jwt-encryption-algorithm-ecdh-es": "^2",
+    "web-token/jwt-encryption-algorithm-pbes2": "^2",
+    "web-token/jwt-encryption-algorithm-rsa": "^2",
+    "web-token/jwt-signature-algorithm-ecdsa": "^2",
+    "web-token/jwt-signature-algorithm-eddsa": "^2",
+    "web-token/jwt-signature-algorithm-hmac": "^2",
+    "web-token/jwt-signature-algorithm-none": "^2",
+    "web-token/jwt-signature-algorithm-rsa": "^2",
+    "web-token/jwt-checker": "^2"
   }
 }
-
