@@ -134,6 +134,8 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
       }
     }
     $destination = $parameters['destination'];
+    // Hook-provided destination.
+    $altered_destination = '';
 
     $configuration = $this->config('openid_connect.settings.' . $client_name)
       ->get('settings');
@@ -179,6 +181,9 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
         $success = NULL;
         if ($parameters['op'] === 'login') {
           $success = $this->openIDConnect->completeAuthorization($client, $tokens, $destination);
+          if ($success) {
+            $this->moduleHandler()->alter('openid_connect_login_redirect', $altered_destination, $destination);
+          }
         }
         elseif ($parameters['op'] === 'connect' && $parameters['connect_uid'] === $this->currentUser->id()) {
           $success = $this->openIDConnect->connectCurrentUser($client, $tokens);
@@ -196,8 +201,12 @@ class OpenIDConnectRedirectController extends ControllerBase implements AccessIn
       }
     }
 
-    // It's possible to set 'options' in the redirect destination.
-    if (is_array($destination)) {
+    // Is there a new destination from hook_openid_connect_login_redirect_alter?
+    if (!empty($altered_destination)) {
+      $redirect = $altered_destination;
+    }
+    elseif (is_array($destination)) {
+      // It's possible to set 'options' in the redirect destination.
       $query = !empty($destination[1]['query']) ? '?' . $destination[1]['query'] : '';
       $redirect = Url::fromUri('internal:/' . ltrim($destination[0], '/') . $query)->toString();
     }

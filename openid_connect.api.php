@@ -272,3 +272,16 @@ function hook_openid_connect_userinfo_save(UserInterface $account, array $contex
  */
 function hook_openid_connect_user_properties_to_skip_alter(array &$properties_to_skip) {
 }
+
+/**
+ * Alter the post-login redirect destination.
+ *
+ * @param string $altered_destination
+ *   The new destination. Should be a valid URL or empty for not altering the
+ *   destination.
+ * @param array|string $destination
+ *   The destination query parameter that was present on login attempt, or if
+ *   there was none, the default is 'user'.
+ */
+function hook_openid_connect_login_redirect_alter(string &$altered_destination, &$destination) {
+}
