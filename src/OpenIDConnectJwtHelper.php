@@ -124,7 +124,7 @@ class OpenIDConnectJwtHelper {
     'A256KW' => 'A256KW',
     'A192KW' => 'A192KW',
     'A128KW' => 'A128KW',
-    'dir' => 'dir',
+    'dir' => 'Dir',
     'ECDH-ES+A256KW' => 'ECDHESA256KW',
     'ECDH-ES' => 'ECDHES',
     'ECDH-ES+A192KW' => 'ECDHESA192KW',
